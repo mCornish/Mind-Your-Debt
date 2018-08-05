@@ -1,0 +1,25 @@
+{
+  "name": "mind-your-debt-server",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.3",
+    "moment": "^2.22.2",
+    "mongoose": "^5.2.6",
+    "ynab": "^1.2.0"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-env": "^1.7.0",
+    "concurrently": "^3.6.1",
+    "nodemon": "^1.18.3"
+  },
+  "scripts": {
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "node start-server.js",
+    "dev-server": "nodemon server.js --exec babel-node",
+    "prod-server": "node server.js",
+    "client": "node start-client.js"
+  }
+}
