@@ -6,8 +6,8 @@ import { API as ynabAPI } from 'ynab';
 import './App.css';
 
 // TODO: Use server-side Code Grant Flow instead (https://api.youneedabudget.com/#outh-applications)
-const YNAB_ID = process.env.YNAB_CLIENT_ID;
-const YNAB_URI = process.env.YNAB_REDIRECT_URI;
+const YNAB_ID = 'a34b2b9bf5088a52dc8303eec66a65147432d9fd6fa75513b0840cf401f6cde4';
+const YNAB_URI = 'urn:ietf:wg:oauth:2.0:oob';
 const authUrl = `https://app.youneedabudget.com/oauth/authorize?client_id=${YNAB_ID}&redirect_uri=${YNAB_URI}&response_type=token`;
 const Ynab = new ynabAPI(process.env.YNAB_TOKEN);
 
@@ -190,9 +190,13 @@ class App extends Component {
     const allCategories = budget ? await fetchCategories(budget.id) : [];
     const month = budget ? await fetchMonth(budget.id) : [];
 
+    const authToken = getAuthToken();
+    console.log('​App -> init -> authToken', authToken);
+
     this.setState({
       allAccounts,
       allCategories,
+      authToken,
       budget,
       budgets,
       month
@@ -287,6 +291,20 @@ function checkStatus(response) {
   error.response = response;
   console.log(error); // eslint-disable-line no-console
   throw error;
+}
+
+function getAuthToken() {
+  return getParameterByName('access_token');
+}
+
+function getParameterByName(name, url) {
+  if (!url) url = window.location.href;
+  name = name.replace(/[[\]]/g, '\\$&');
+  var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+      results = regex.exec(url);
+  if (!results) return null;
+  if (!results[2]) return '';
+  return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
 
 function parseJSON(response) {

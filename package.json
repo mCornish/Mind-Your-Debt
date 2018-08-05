@@ -18,7 +18,7 @@
   "scripts": {
     "start": "concurrently \"npm run server\" \"npm run client\"",
     "server": "node start-server.js",
-    "dev-server": "nodemon server.js --exec babel-node",
+    "dev-server": "nodemon server.js --exec babel-node --watch server.js",
     "prod-server": "node server.js",
     "client": "node start-client.js"
   }

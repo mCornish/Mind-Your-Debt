@@ -5,7 +5,6 @@ import mongoose from 'mongoose';
 import accountRouter from './routes/accountRouter';
 
 const MONGO_URI = process.env.MONGO_URI;
-console.log('​MONGO_URI', MONGO_URI);
 const db = mongoose.connect(MONGO_URI, { useNewUrlParser: true });
 
 const app = express();
