@@ -1,8 +1,18 @@
 import express from 'express';
+import fs from 'fs';
+import https from 'https';
 import bodyParser from 'body-parser';
 import mongoose from 'mongoose';
 
 import accountRouter from './routes/accountRouter';
+import userRouter from './routes/userRouter';
+
+const serverOptions = {
+  key: fs.readFileSync('./server.key'),
+  cert: fs.readFileSync('./server.crt'),
+  requestCert: false,
+  rejectUnauthorized: false
+};
 
 const MONGO_URI = process.env.MONGO_URI;
 const db = mongoose.connect(MONGO_URI, { useNewUrlParser: true });
@@ -19,7 +29,8 @@ if (process.env.NODE_ENV === "production") {
 }
 
 app.use('/api/accounts', accountRouter);
+app.use('/api/users', userRouter);
 
-app.listen(app.get("port"), () => {
-  console.log(`Find the server at: http://localhost:${app.get("port")}/`); // eslint-disable-line no-console
+https.createServer(serverOptions, app).listen(app.get("port"), () => {
+  console.log(`Find the server at: https://localhost:${app.get("port")}/`); // eslint-disable-line no-console
 });

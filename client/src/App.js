@@ -7,9 +7,9 @@ import './App.css';
 
 // TODO: Use server-side Code Grant Flow instead (https://api.youneedabudget.com/#outh-applications)
 const YNAB_ID = 'a34b2b9bf5088a52dc8303eec66a65147432d9fd6fa75513b0840cf401f6cde4';
-const YNAB_URI = 'urn:ietf:wg:oauth:2.0:oob';
+const YNAB_URI = 'https://localhost:3000';
+const YNAB_BASE = 'https://api.youneedabudget.com/v1';
 const authUrl = `https://app.youneedabudget.com/oauth/authorize?client_id=${YNAB_ID}&redirect_uri=${YNAB_URI}&response_type=token`;
-const Ynab = new ynabAPI(process.env.YNAB_TOKEN);
 
 function averagePayments(transactions) {
   const monthPayments = transactions.reduce(toMonths, {});
@@ -31,30 +31,35 @@ function averagePayments(transactions) {
   }
 }
 
-async function fetchAccounts(budgetId) {
-  return await axios('/api/accounts').then(checkStatus).then(parseJSON);
+async function fetchAccounts(token, budgetId) {
+  return await axios(`${YNAB_BASE}/budgets/${budgetId}/accounts`).then((res) => res.data, (err) => { throw err });
   // return await Ynab.accounts.getAccounts(budgetId).then((res) => res.data.accounts);
 }
 
-async function fetchBudgets() {
+async function fetchBudgets(Ynab) {
   return await Ynab.budgets.getBudgets().then((res) => res.data.budgets);
 }
 
-async function fetchCategories(budgetId) {
+async function fetchCategories(Ynab, budgetId) {
   // const budgetId = givenBudgetId || await fetchBudgets().then((budgets) => budgets[0].id);
   const groups = await Ynab.categories.getCategories(budgetId).then((res) => res.data.category_groups);
   const categories = _.flatten(_.map(groups, 'categories'));
   return categories;
 }
 
-async function fetchMonth(budgetId) {
+async function fetchMonth(Ynab, budgetId) {
   const month = await Ynab.months.getBudgetMonth(budgetId, 'current').then((res) => res.data.month);
   return month
 }
 
-async function fetchTransactions(budgetId, accountId) {
+async function fetchTransactions(Ynab, budgetId, accountId) {
   const transactions = await Ynab.transactions.getTransactionsByAccount(budgetId, accountId).then((res) => res.data.transactions);
   return transactions;
+}
+
+async function fetchUser(token) {
+  const user = await axios(`/api/users?token=${token}`).then((res) => res.data, (err) => { throw err });
+  return user;
 }
 
 function leastRecentDate(dates, format='MM-YY') {
@@ -98,7 +103,8 @@ class App extends Component {
     payoffBudget: null,
     month: null,
     payoffDate: null,
-    transactions: {}
+    transactions: {},
+    Ynab: null
   };
 
   componentDidMount() {
@@ -184,14 +190,15 @@ class App extends Component {
   }
 
   init = async () => {
-    const budgets = await fetchBudgets();
+    const authToken = getAuthToken();
+    const Ynab = new ynabAPI(authToken);
+    const user = await fetchUser(authToken);
+
+    const budgets = await fetchBudgets(Ynab);
     const budget = budgets.length === 1 ? budgets[0] : null;
     const allAccounts = budget ? await fetchAccounts(budget.id) : [];
     const allCategories = budget ? await fetchCategories(budget.id) : [];
     const month = budget ? await fetchMonth(budget.id) : [];
-
-    const authToken = getAuthToken();
-    console.log('​App -> init -> authToken', authToken);
 
     this.setState({
       allAccounts,
@@ -199,7 +206,8 @@ class App extends Component {
       authToken,
       budget,
       budgets,
-      month
+      month,
+      Ynab
     });
   }
 
@@ -282,33 +290,12 @@ class App extends Component {
   }
 }
 
-function checkStatus(response) {
-  if (response.status >= 200 && response.status < 300) {
-    return response;
-  }
-  const error = new Error(`HTTP Error ${response.statusText}`);
-  error.status = response.statusText;
-  error.response = response;
-  console.log(error); // eslint-disable-line no-console
-  throw error;
-}
-
 function getAuthToken() {
-  return getParameterByName('access_token');
-}
-
-function getParameterByName(name, url) {
-  if (!url) url = window.location.href;
-  name = name.replace(/[[\]]/g, '\\$&');
-  var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
-      results = regex.exec(url);
-  if (!results) return null;
-  if (!results[2]) return '';
-  return decodeURIComponent(results[2].replace(/\+/g, ' '));
-}
-
-function parseJSON(response) {
-  return response.json();
+  const search = window.location.hash ?
+    window.location.hash.replace('#', '?') :
+    window.location.search;
+  const params = new URLSearchParams(search);
+  return params.get('access_token');
 }
 
 export default App;
