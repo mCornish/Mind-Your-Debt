@@ -16,7 +16,7 @@ userRouter.route('/')
 
       User.findOne({ id: ynabUser.id }, async (err, user) => {
         if (err) next(err);
-        if (user) res.json(user);
+        if (user) return res.json(user);
         const newUser = new User({ id: ynabUser.id });
 
         await newUser.save();

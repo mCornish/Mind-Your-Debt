@@ -104,6 +104,7 @@ class App extends Component {
     month: null,
     payoffDate: null,
     transactions: {},
+    user: null,
     Ynab: null
   };
 
@@ -112,7 +113,7 @@ class App extends Component {
   }
 
   render() {
-    const authorized = _.get(this.state, 'user.authToken');
+    const authorized = this.state.user
 
     return (
       <div className="App">
@@ -207,6 +208,7 @@ class App extends Component {
       budget,
       budgets,
       month,
+      user,
       Ynab
     });
   }
