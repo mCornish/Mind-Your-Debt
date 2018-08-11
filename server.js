@@ -3,9 +3,13 @@ import fs from 'fs';
 import https from 'https';
 import bodyParser from 'body-parser';
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
 
 import accountRouter from './routes/accountRouter';
 import userRouter from './routes/userRouter';
+
+// Set environment variables
+dotenv.config();
 
 const serverOptions = {
   key: fs.readFileSync('./server.key'),
