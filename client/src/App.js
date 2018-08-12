@@ -6,9 +6,8 @@ import { API as ynabAPI } from 'ynab';
 import './App.css';
 
 // TODO: Use server-side Code Grant Flow instead (https://api.youneedabudget.com/#outh-applications)
-const YNAB_ID = 'a34b2b9bf5088a52dc8303eec66a65147432d9fd6fa75513b0840cf401f6cde4';
-const YNAB_URI = 'https://localhost:3000';
-const YNAB_BASE = 'https://api.youneedabudget.com/v1';
+const YNAB_ID = process.env.REACT_APP_YNAB_CLIENT_ID;
+const YNAB_URI = process.env.REACT_APP_YNAB_REDIRECT_URI;
 const authUrl = `https://app.youneedabudget.com/oauth/authorize?client_id=${YNAB_ID}&redirect_uri=${YNAB_URI}&response_type=token`;
 
 function averagePayments(transactions) {
@@ -31,30 +30,40 @@ function averagePayments(transactions) {
   }
 }
 
-async function fetchAccounts(token, budgetId) {
-  return await axios(`${YNAB_BASE}/budgets/${budgetId}/accounts`).then((res) => res.data, (err) => { throw err });
-  // return await Ynab.accounts.getAccounts(budgetId).then((res) => res.data.accounts);
+async function fetchAccounts(budgetId, token) {
+  return await axios(`/api/budgets/${budgetId}/accounts?token=${token}`)
+    .then((res) => res.data)
+    .catch((err) => { throw err });
 }
 
-async function fetchBudgets(Ynab) {
-  return await Ynab.budgets.getBudgets().then((res) => res.data.budgets);
+async function fetchBudget(budgetId, token) {
+  return await axios(`/api/budgets/${budgetId}?token=${token}`)
+  .then((res) => res.data)
+  .catch((err) => { throw err });
 }
 
-async function fetchCategories(Ynab, budgetId) {
-  // const budgetId = givenBudgetId || await fetchBudgets().then((budgets) => budgets[0].id);
-  const groups = await Ynab.categories.getCategories(budgetId).then((res) => res.data.category_groups);
-  const categories = _.flatten(_.map(groups, 'categories'));
-  return categories;
+async function fetchBudgets(token) {
+  return await axios(`/api/budgets?token=${token}`)
+    .then((res) => res.data)
+    .catch((err) => { throw err });
 }
 
-async function fetchMonth(Ynab, budgetId) {
-  const month = await Ynab.months.getBudgetMonth(budgetId, 'current').then((res) => res.data.month);
-  return month
+async function fetchCategories(budgetId, token) {
+  return await axios(`/api/budgets/${budgetId}/categories?token=${token}`)
+    .then((res) => res.data)
+    .catch((err) => { throw err });
 }
 
-async function fetchTransactions(Ynab, budgetId, accountId) {
-  const transactions = await Ynab.transactions.getTransactionsByAccount(budgetId, accountId).then((res) => res.data.transactions);
-  return transactions;
+async function fetchMonth(budgetId, token) {
+  return await axios(`/api/budgets/${budgetId}/months/current?token=${token}`)
+    .then((res) => res.data)
+    .catch((err) => { throw err });
+}
+
+async function fetchTransactions(budgetId, accountId, token) {
+  return await axios(`/api/budgets/${budgetId}/accounts/${accountId}/transactions?token=${token}`)
+    .then((res) => res.data)
+    .catch((err) => { throw err });
 }
 
 async function fetchUser(token) {
@@ -113,78 +122,81 @@ class App extends Component {
   }
 
   render() {
-    const authorized = this.state.user
+    const authorized = this.state.user;
 
     return (
       <div className="App">
         <h1>Mind Your Debt</h1>
-        {!authorized && (
+        {authorized ? (
+          <div>
+            {this.state.budget && (
+              <ul>
+                {this.state.allAccounts.map((account) => (
+                  <li key={account.id}>
+                    <label htmlFor={`acc-${account.id}`}>
+                      <input
+                        id={`acc-${account.id}`}
+                        type="checkbox"
+                        onChange={(e) => this.toggleAccount(account, e.target.checked)}
+                      />
+                      {account.name}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+            
+            <h2>
+              <label htmlFor="budget">
+              Payoff Budget:
+              <input
+                id="budget"
+                onChange={(e) => this.setBudget(e.target.value)}
+              />
+              </label>
+            </h2>
+            {this.state.month && (
+              <h2>To Be Budgeted: {toDollars(this.state.month.to_be_budgeted)}</h2>
+            )}
+            <h2>Debts</h2>
+            {!!this.state.accounts.length && (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Balance</th>
+                    <th>Interest Rate (%)</th>
+                    <th>Average Payment</th>
+                    <th>Payoff Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {this.state.accounts.map((account) => (
+                    <tr key={`active-${account.id}`}>
+                      <td>{account.name}</td>
+                      <td>{toDollars(account.balance)}</td>
+                      <td>
+                        <input
+                          type="number"
+                          onChange={(e) => this.setInterest(account, e.target.value)}
+                        />
+                      </td>
+                      <td>{toDollars(this.averagePayment(account))}</td>
+                      <td>{this.accountPayoffDate(account).format('MMM YYYY')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+    
+            {this.state.payoffDate && (
+              <h2>
+              Payoff Date: {this.state.payoffDate.format('MMM YYYY')} ({this.state.payoffDate.fromNow()})
+              </h2>
+            )}
+          </div>
+        ) : (
           <a href={authUrl}>Sign In</a>
-        )}
-        {this.state.budget && (
-          <ul>
-            {this.state.allAccounts.map((account) => (
-              <li key={account.id}>
-                <label htmlFor={`acc-${account.id}`}>
-                  <input
-                    id={`acc-${account.id}`}
-                    type="checkbox"
-                    onChange={(e) => this.toggleAccount(account, e.target.checked)}
-                  />
-                  {account.name}
-                </label>
-              </li>
-            ))}
-          </ul>
-        )}
-        
-        <h2>
-          <label htmlFor="budget">
-          Payoff Budget:
-          <input
-            id="budget"
-            onChange={(e) => this.setBudget(e.target.value)}
-          />
-          </label>
-        </h2>
-        {this.state.month && (
-          <h2>To Be Budgeted: {toDollars(this.state.month.to_be_budgeted)}</h2>
-        )}
-        <h2>Debts</h2>
-        {!!this.state.accounts.length && (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Balance</th>
-                <th>Interest Rate (%)</th>
-                <th>Average Payment</th>
-                <th>Payoff Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {this.state.accounts.map((account) => (
-                <tr key={`active-${account.id}`}>
-                  <td>{account.name}</td>
-                  <td>{toDollars(account.balance)}</td>
-                  <td>
-                    <input
-                      type="number"
-                      onChange={(e) => this.setInterest(account, e.target.value)}
-                    />
-                  </td>
-                  <td>{toDollars(this.averagePayment(account))}</td>
-                  <td>{this.accountPayoffDate(account).format('MMM YYYY')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {this.state.payoffDate && (
-          <h2>
-          Payoff Date: {this.state.payoffDate.format('MMM YYYY')} ({this.state.payoffDate.fromNow()})
-          </h2>
         )}
       </div>
     );
@@ -192,14 +204,15 @@ class App extends Component {
 
   init = async () => {
     const authToken = getAuthToken();
+    if (!authToken) return undefined;
     const Ynab = new ynabAPI(authToken);
     const user = await fetchUser(authToken);
 
-    const budgets = await fetchBudgets(Ynab);
+    const budgets = await fetchBudgets(authToken);
     const budget = budgets.length === 1 ? budgets[0] : null;
-    const allAccounts = budget ? await fetchAccounts(budget.id) : [];
-    const allCategories = budget ? await fetchCategories(budget.id) : [];
-    const month = budget ? await fetchMonth(budget.id) : [];
+    const allAccounts = budget ? await fetchAccounts(budget.id, authToken) : [];
+    const allCategories = budget ? await fetchCategories(budget.id, authToken) : [];
+    const month = budget ? await fetchMonth(budget.id, authToken) : [];
 
     this.setState({
       allAccounts,
@@ -263,7 +276,7 @@ class App extends Component {
   }
 
   toggleAccount = async (account, willBeActive) => {
-    const accountTransactions = this.state.transactions[account.id] || await fetchTransactions(this.state.budget.id, account.id);
+    const accountTransactions = this.state.transactions[account.id] || await fetchTransactions(this.state.budget.id, account.id, this.state.authToken);
     const transactions = accountTransactions ?
       _.assign({}, this.state.transactions, { [account.id]: accountTransactions}) :
       this.state.transactions;
