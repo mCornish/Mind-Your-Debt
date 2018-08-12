@@ -122,6 +122,7 @@ class App extends Component {
   }
 
   render() {
+    const accounts = this.state.accounts;
     const authorized = this.state.user;
 
     return (
@@ -159,22 +160,29 @@ class App extends Component {
               <h2>To Be Budgeted: {toDollars(this.state.month.to_be_budgeted)}</h2>
             )}
             <h2>Debts</h2>
-            {!!this.state.accounts.length && (
+            {!!accounts.length && (
               <table>
                 <thead>
                   <tr>
                     <th>Name</th>
                     <th>Balance</th>
+                    <th>Principal</th>
                     <th>Interest Rate (%)</th>
                     <th>Average Payment</th>
                     <th>Payoff Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {this.state.accounts.map((account) => (
+                  {accounts.map((account) => (
                     <tr key={`active-${account.id}`}>
                       <td>{account.name}</td>
                       <td>{toDollars(account.balance)}</td>
+                      <td>
+                        <input
+                          type="number"
+                          onChange={(e) => this.setPrincipal(account, e.target.value)}
+                        />
+                      </td>
                       <td>
                         <input
                           type="number"
@@ -185,6 +193,14 @@ class App extends Component {
                       <td>{this.accountPayoffDate(account).format('MMM YYYY')}</td>
                     </tr>
                   ))}
+                  <tr>
+                    <td>Total</td>
+                    <td>{toDollars(_.sumBy(accounts, 'balance'))}</td>
+                    <td>{toDollars(_.meanBy(accounts, 'principal'))}</td>
+                    <td>{_.meanBy(accounts, 'interestRate') * 100}</td>
+                    <td>{toDollars(_.sumBy(accounts, this.averagePayment))}</td>
+                    <td>{this.state.payoffDate.format('MMM YYYY')}</td>
+                  </tr>
                 </tbody>
               </table>
             )}
@@ -233,7 +249,6 @@ class App extends Component {
     const principal = account.principal || account.balance;
     const rate = account.interestRate;
     const monthsRemaining = payoffMonths({ payment, principal, rate });
-    console.log(payment, principal, rate, monthsRemaining)
     return moment().add(monthsRemaining, 'months');
   }
 
@@ -262,17 +277,11 @@ class App extends Component {
   }
 
   setInterest = (account, rate) => {
-    const newAccount = _.assign({}, account, {
-      interestRate: rate / 100
-    });
-    const accountIndex = _.findIndex(this.state.accounts, { id: account.id });
-    const accounts = this.state.accounts;
-    accounts[accountIndex] = newAccount;
+    this.updateAccount(account, { interestRate: rate / 100 });
+  }
 
-    this.setState({
-      accounts,
-      payoffDate: this.payoffDate(this.state.accounts, this.state.payoffBudget)
-    });
+  setPrincipal = (account, principal) => {
+    this.updateAccount(account, { principal: principal * 1000 });
   }
 
   toggleAccount = async (account, willBeActive) => {
@@ -302,6 +311,18 @@ class App extends Component {
       currentCategories.concat(category) :
       _.reject(currentCategories, { id: category.id });
     this.setState({ categories });
+  }
+
+  updateAccount = (account, accountInfo) => {
+    const accountIndex = _.findIndex(this.state.accounts, { id: account.id });
+    const accounts = this.state.accounts;
+    const newAccount = _.assign({}, accounts[accountIndex], accountInfo);
+    accounts[accountIndex] = newAccount;
+
+    this.setState({
+      accounts,
+      payoffDate: this.payoffDate(this.state.accounts, this.state.payoffBudget)
+    });
   }
 }
 
