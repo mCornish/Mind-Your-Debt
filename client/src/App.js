@@ -2,10 +2,8 @@ import React, { Component } from 'react';
 import _ from 'lodash';
 import axios from 'axios';
 import moment from 'moment';
-import { API as ynabAPI } from 'ynab';
 import './App.css';
 
-// TODO: Use server-side Code Grant Flow instead (https://api.youneedabudget.com/#outh-applications)
 const YNAB_ID = process.env.REACT_APP_YNAB_CLIENT_ID;
 const YNAB_URI = process.env.REACT_APP_YNAB_REDIRECT_URI;
 const authUrl = `https://app.youneedabudget.com/oauth/authorize?client_id=${YNAB_ID}&redirect_uri=${YNAB_URI}&response_type=token`;
@@ -67,8 +65,8 @@ async function fetchTransactions(budgetId, accountId, token) {
 }
 
 async function fetchUser(token) {
-  const user = await axios(`/api/users?token=${token}`).then((res) => res.data, (err) => { throw err });
-  return user;
+  const userRes = await axios(`/api/users/ynab-user/${token}`);
+  return userRes.data;
 }
 
 function leastRecentDate(dates, format='MM-YY') {
@@ -221,7 +219,6 @@ class App extends Component {
   init = async () => {
     const authToken = getAuthToken();
     if (!authToken) return undefined;
-    const Ynab = new ynabAPI(authToken);
     const user = await fetchUser(authToken);
 
     const budgets = await fetchBudgets(authToken);
@@ -237,8 +234,7 @@ class App extends Component {
       budget,
       budgets,
       month,
-      user,
-      Ynab
+      user
     });
   }
 
@@ -268,6 +264,43 @@ class App extends Component {
     return leastRecentDate(payoffDates);
   }
 
+  setAccountActive = async (account) => {
+    if (this.state.accounts.includes(account)) return undefined;
+    const accountTransactions = this.state.transactions[account.id] || await fetchTransactions(this.state.budget.id, account.id, this.state.authToken);
+    const transactions = accountTransactions ?
+      _.assign({}, this.state.transactions, { [account.id]: accountTransactions}) :
+      this.state.transactions;
+
+    const newAccount = _.assign({}, account, {
+      averagePayments: averagePayments(accountTransactions),
+      owner: this.state.user._id,
+      ynabId: account.id
+    });
+    const accounts = this.state.accounts.concat(newAccount);
+
+    this.setState({
+      accounts,
+      payoffDate: this.payoffDate(accounts, this.state.payoffBudget),
+      transactions
+    });
+
+    const accountRes = await axios.post(`/api/accounts/`, newAccount);
+    axios.post(`/api/users/${this.state.user._id}/accounts`, { accountId: accountRes.data._id });
+  }
+
+  setAccountInactive = async (account) => {
+    const accounts = _.reject(this.state.accounts, { id: account.id });
+    const transactions = _.omit(this.state.transactions, account.id);
+    
+    axios.delete(`/api/accounts/:id`);
+
+    this.setState({
+      accounts,
+      payoffDate: this.payoffDate(accounts, this.state.payoffBudget),
+      transactions
+    });
+  }
+
   setBudget = (newBudget) => {
     const payoffBudget = newBudget * 1000;
     this.setState({
@@ -285,24 +318,7 @@ class App extends Component {
   }
 
   toggleAccount = async (account, willBeActive) => {
-    const accountTransactions = this.state.transactions[account.id] || await fetchTransactions(this.state.budget.id, account.id, this.state.authToken);
-    const transactions = accountTransactions ?
-      _.assign({}, this.state.transactions, { [account.id]: accountTransactions}) :
-      this.state.transactions;
-
-    const newAccount = _.assign({}, account, {
-      averagePayments: averagePayments(accountTransactions)
-    });
-    const currentAccounts = this.state.accounts;
-    const accounts = willBeActive ?
-      currentAccounts.concat(newAccount) :
-      _.reject(currentAccounts, { id: account.id });  
-
-    this.setState({
-      accounts,
-      payoffDate: this.payoffDate(accounts, this.state.payoffBudget),
-      transactions
-    });
+    willBeActive ? this.setAccountActive(account) : this.setAccountInactive(account);
   }
 
   toggleCategory = (category, willBeActive) => {

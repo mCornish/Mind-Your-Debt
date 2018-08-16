@@ -5,8 +5,10 @@ import bodyParser from 'body-parser';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
+import accountRouter from './routes/accountRouter';
 import budgetRouter from './routes/budgetRouter';
 import userRouter from './routes/userRouter';
+
 
 // Set environment variables
 dotenv.config();
@@ -32,6 +34,7 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static("client/build"));
 }
 
+app.use('/api/accounts', accountRouter);
 app.use('/api/budgets', budgetRouter);
 app.use('/api/users', userRouter);
 

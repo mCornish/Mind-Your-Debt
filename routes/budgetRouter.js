@@ -2,7 +2,6 @@ import express from 'express';
 import axios from 'axios';
 import { flatten, map } from 'lodash';
 import { YNAB_BASE } from '../config';
-// import Account from '../models/accountModel';
 const budgetRouter = express.Router();
 
 budgetRouter.route('/')
