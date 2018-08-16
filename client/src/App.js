@@ -292,6 +292,7 @@ class App extends Component {
     const accounts = _.reject(this.state.accounts, { id: account.id });
     const transactions = _.omit(this.state.transactions, account.id);
     
+    // TODO: Create this API
     axios.delete(`/api/accounts/:id`);
 
     this.setState({
@@ -334,6 +335,8 @@ class App extends Component {
     const accounts = this.state.accounts;
     const newAccount = _.assign({}, accounts[accountIndex], accountInfo);
     accounts[accountIndex] = newAccount;
+
+    // TODO: Update Account via API
 
     this.setState({
       accounts,
