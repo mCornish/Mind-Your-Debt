@@ -6,3 +6,9 @@ export async function createAccount(req, res) {
   const account = await (new Account(req.body)).save();
   res.json(account);
 }
+
+export async function deleteAccount(req, res) {
+  const account = await Account.deleteOne({ _id: req.params.id });
+  console.log(account);
+  res.json(account);
+}

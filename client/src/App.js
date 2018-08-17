@@ -312,11 +312,11 @@ class App extends Component {
   }
 
   setAccountInactive = async (account) => {
-    const accounts = _.reject(this.state.accounts, { id: account.id });
+    const accountId = _.find(this.state.accounts, { ynabId: account.id })._id;
+    const accounts = _.reject(this.state.accounts, { ynabId: account.id });
     // const transactions = _.omit(this.state.transactions, account.id);
-    
-    // TODO: Create this API
-    axios.delete(`/api/accounts/:id`);
+  
+    axios.delete(`/api/accounts/${accountId}`);
 
     this.setState({
       accounts,
