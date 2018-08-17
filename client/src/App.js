@@ -8,7 +8,7 @@ const YNAB_ID = process.env.REACT_APP_YNAB_CLIENT_ID;
 const YNAB_URI = process.env.REACT_APP_YNAB_REDIRECT_URI;
 const authUrl = `https://app.youneedabudget.com/oauth/authorize?client_id=${YNAB_ID}&redirect_uri=${YNAB_URI}&response_type=token`;
 
-function averagePayments(transactions) {
+function averageTransaction(transactions) {
   const monthPayments = transactions.reduce(toMonths, {});
   return _.toPairs(monthPayments).reduce(toAverages, {});
 
@@ -96,7 +96,8 @@ function sortMoments(moments) {
 
 function toDollars(milliunits) {
   const sign = milliunits < 0 ? '-' : '';
-  return `${sign} $${Math.abs(milliunits / 1000).toFixed(2)}`;
+  const value = Math.abs(milliunits / 1000).toFixed(2);
+  return isNaN(value) ? null : `${sign} $${value}`;
 }
 
 class App extends Component {
@@ -109,7 +110,7 @@ class App extends Component {
     categories: [],
     payoffBudget: null,
     month: null,
-    payoffDate: null,
+    payoffDate: moment(),
     transactions: {},
     user: null,
     Ynab: null
@@ -137,6 +138,7 @@ class App extends Component {
                         id={`acc-${account.id}`}
                         type="checkbox"
                         onChange={(e) => this.toggleAccount(account, e.target.checked)}
+                        checked={_.map(this.state.accounts, 'ynabId').includes(account.id)}
                       />
                       {account.name}
                     </label>
@@ -194,8 +196,8 @@ class App extends Component {
                   <tr>
                     <td>Total</td>
                     <td>{toDollars(_.sumBy(accounts, 'balance'))}</td>
-                    <td>{toDollars(_.meanBy(accounts, 'principal'))}</td>
-                    <td>{_.meanBy(accounts, 'interestRate') * 100}</td>
+                    <td>{toDollars(_.meanBy(accounts, 'principal')) || '--'}</td>
+                    <td>{_.meanBy(accounts, 'interestRate') * 100 || '--'}</td>
                     <td>{toDollars(_.sumBy(accounts, this.averagePayment))}</td>
                     <td>{this.state.payoffDate.format('MMM YYYY')}</td>
                   </tr>
@@ -220,14 +222,22 @@ class App extends Component {
     const authToken = getAuthToken();
     if (!authToken) return undefined;
     const user = await fetchUser(authToken);
-
+    
     const budgets = await fetchBudgets(authToken);
     const budget = budgets.length === 1 ? budgets[0] : null;
-    const allAccounts = budget ? await fetchAccounts(budget.id, authToken) : [];
-    const allCategories = budget ? await fetchCategories(budget.id, authToken) : [];
-    const month = budget ? await fetchMonth(budget.id, authToken) : [];
+    const accountsPromise = fetchAccounts(budget.id, authToken);
+    const categoriesPromise = fetchCategories(budget.id, authToken);
+    const monthPromise = fetchMonth(budget.id, authToken);
+    const [ allAccounts, allCategories, month ] = budget ?
+    await Promise.all([ accountsPromise, categoriesPromise, monthPromise ]) :
+    [[],[],null];
+
+    // Add YNAB data to saved accounts and initialize them
+    const combinedAccounts = user.accounts.map(toCombined);
+    const accounts = await Promise.all(combinedAccounts.map((account) => this.initAccount(account, budget, authToken, user)));
 
     this.setState({
+      accounts,
       allAccounts,
       allCategories,
       authToken,
@@ -236,6 +246,11 @@ class App extends Component {
       month,
       user
     });
+
+    function toCombined(account) {
+      const ynabAccount = _.find(allAccounts, { id: account.ynabId }) || {};
+      return _.assign({}, account, ynabAccount);
+    }
   }
 
   accountPayoffDate = (account) => {
@@ -250,7 +265,23 @@ class App extends Component {
 
   averagePayment = (account) => {
     const mostRecentMonth = mostRecentDate(_.keys(account.averagePayments));
+    if (!mostRecentMonth) return 0;
     return account.averagePayments[mostRecentMonth.format('MM-YY')];
+  }
+
+  initAccount = async (account, budget = this.state.budget, token = this.state.authToken, user = this.state.user) => {
+    const transactions =
+    // this.state.transactions[account.id] ||
+    await fetchTransactions(budget.id, account.id, token);
+    // const transactions = accountTransactions ?
+    // _.assign({}, this.state.transactions, { [account.id]: accountTransactions}) :
+    // this.state.transactions;
+
+    return _.assign({}, account, {
+      averagePayments: await averageTransaction(transactions),
+      owner: user._id,
+      ynabId: account.ynabId || account.id
+    });
   }
 
   payoffDate = (accounts, monthlyPayment) => {
@@ -266,22 +297,14 @@ class App extends Component {
 
   setAccountActive = async (account) => {
     if (this.state.accounts.includes(account)) return undefined;
-    const accountTransactions = this.state.transactions[account.id] || await fetchTransactions(this.state.budget.id, account.id, this.state.authToken);
-    const transactions = accountTransactions ?
-      _.assign({}, this.state.transactions, { [account.id]: accountTransactions}) :
-      this.state.transactions;
-
-    const newAccount = _.assign({}, account, {
-      averagePayments: averagePayments(accountTransactions),
-      owner: this.state.user._id,
-      ynabId: account.id
-    });
+    
+    const newAccount = await this.initAccount(account);
     const accounts = this.state.accounts.concat(newAccount);
 
     this.setState({
       accounts,
       payoffDate: this.payoffDate(accounts, this.state.payoffBudget),
-      transactions
+      // transactions
     });
 
     const accountRes = await axios.post(`/api/accounts/`, newAccount);
@@ -290,7 +313,7 @@ class App extends Component {
 
   setAccountInactive = async (account) => {
     const accounts = _.reject(this.state.accounts, { id: account.id });
-    const transactions = _.omit(this.state.transactions, account.id);
+    // const transactions = _.omit(this.state.transactions, account.id);
     
     // TODO: Create this API
     axios.delete(`/api/accounts/:id`);
@@ -298,7 +321,7 @@ class App extends Component {
     this.setState({
       accounts,
       payoffDate: this.payoffDate(accounts, this.state.payoffBudget),
-      transactions
+      // transactions
     });
   }
 
