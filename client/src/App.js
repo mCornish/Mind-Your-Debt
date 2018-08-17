@@ -180,13 +180,15 @@ class App extends Component {
                       <td>
                         <input
                           type="number"
-                          onChange={(e) => this.setPrincipal(account, e.target.value)}
+                          onBlur={(e) => this.setPrincipal(account, e.target.value)}
+                          defaultValue={account.principal ? account.principal / 1000 : null}
                         />
                       </td>
                       <td>
                         <input
                           type="number"
-                          onChange={(e) => this.setInterest(account, e.target.value)}
+                          onBlur={(e) => this.setInterest(account, e.target.value)}
+                          defaultValue={account.interestRate ? account.interestRate * 100 : 0}
                         />
                       </td>
                       <td>{toDollars(this.averagePayment(account))}</td>
@@ -315,14 +317,15 @@ class App extends Component {
     const accountId = _.find(this.state.accounts, { ynabId: account.id })._id;
     const accounts = _.reject(this.state.accounts, { ynabId: account.id });
     // const transactions = _.omit(this.state.transactions, account.id);
-  
-    axios.delete(`/api/accounts/${accountId}`);
-
+    
     this.setState({
       accounts,
       payoffDate: this.payoffDate(accounts, this.state.payoffBudget),
       // transactions
     });
+
+    axios.delete(`/api/accounts/${accountId}`)
+      .catch((err) => { throw err });
   }
 
   setBudget = (newBudget) => {
@@ -334,10 +337,12 @@ class App extends Component {
   }
 
   setInterest = (account, rate) => {
+    if (rate === account.interestRate) return undefined;
     this.updateAccount(account, { interestRate: rate / 100 });
   }
 
   setPrincipal = (account, principal) => {
+    if (!principal || principal === account.principal) return undefined;
     this.updateAccount(account, { principal: principal * 1000 });
   }
 
@@ -359,12 +364,13 @@ class App extends Component {
     const newAccount = _.assign({}, accounts[accountIndex], accountInfo);
     accounts[accountIndex] = newAccount;
 
-    // TODO: Update Account via API
-
     this.setState({
       accounts,
       payoffDate: this.payoffDate(this.state.accounts, this.state.payoffBudget)
     });
+
+    axios.put(`/api/accounts/${account._id}`, accountInfo)
+      .catch((err) => { throw err });
   }
 }
 

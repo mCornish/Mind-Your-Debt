@@ -9,6 +9,12 @@ export async function createAccount(req, res) {
 
 export async function deleteAccount(req, res) {
   const account = await Account.deleteOne({ _id: req.params.id });
-  console.log(account);
   res.json(account);
+}
+
+export async function updateAccount(req, res) {
+  const account = await Account.findById(req.params.id);
+  account.set(req.body);
+  const updatedAccount = await account.save();
+  res.json(updatedAccount);
 }
