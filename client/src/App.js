@@ -4,10 +4,6 @@ import axios from 'axios';
 import moment from 'moment';
 import './App.css';
 
-const YNAB_ID = process.env.REACT_APP_YNAB_CLIENT_ID;
-const YNAB_URI = process.env.REACT_APP_YNAB_REDIRECT_URI;
-const authUrl = `https://app.youneedabudget.com/oauth/authorize?client_id=${YNAB_ID}&redirect_uri=${YNAB_URI}&response_type=token`;
-
 function averageTransaction(transactions) {
   const monthPayments = transactions.reduce(toMonths, {});
   return _.toPairs(monthPayments).reduce(toAverages, {});
@@ -105,6 +101,7 @@ class App extends Component {
     accounts: [],
     allAccounts: [],
     allCategories: [],
+    authUrl: '',
     budgets: [],
     budget: null,
     categories: [],
@@ -245,28 +242,35 @@ class App extends Component {
             )}
           </div>
         ) : (
-          <a role="button" href={authUrl}>Sign In To YNAB</a>
+          <a role="button" href={this.state.authUrl}>Sign In To YNAB</a>
         )}
       </div>
     );
   }
 
   init = async () => {
-    const authToken = getAuthToken();
-    if (!authToken) return undefined;
-    const user = await fetchUser(authToken);
-    
-    const budgets = await fetchBudgets(authToken);
-    if (!budgets.length) return undefined;
-    const budget = user.budgetId ? _.find(budgets, { id: user.budgetId }) : budgets[0];
-    if (budget) this.fetchBudgetInfo({ authToken, budgetId: budget.id, user });
+    try {
+      const authToken = getAuthToken();
+      if (!authToken) {
+        const urlRes = await axios('/api/authUrl');
+        return this.setState({ authUrl: urlRes.data.authUrl });
+      };
+      const user = await fetchUser(authToken);
+      
+      const budgets = await fetchBudgets(authToken);
+      if (!budgets.length) return undefined;
+      const budget = user.budgetId ? _.find(budgets, { id: user.budgetId }) : budgets[0];
+      if (budget) this.fetchBudgetInfo({ authToken, budgetId: budget.id, user });
 
-    this.setState({
-      authToken,
-      budget,
-      budgets,
-      user
-    });
+      this.setState({
+        authToken,
+        budget,
+        budgets,
+        user
+      });
+    } catch (err) {
+      throw err;
+    }
   }
 
   accountPayoffDate = (account) => {

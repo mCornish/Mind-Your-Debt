@@ -11,7 +11,7 @@ import userRouter from './routes/userRouter';
 
 
 // Set environment variables
-dotenv.config();
+const env = dotenv.config();
 
 const serverOptions = {
   key: fs.readFileSync('./server.key'),
@@ -20,6 +20,8 @@ const serverOptions = {
   rejectUnauthorized: false
 };
 
+const YNAB_ID = process.env.YNAB_CLIENT_ID;
+const YNAB_URI = process.env.YNAB_REDIRECT_URI;
 const MONGO_URI = process.env.MONGO_URI;
 const db = mongoose.connect(MONGO_URI, { useNewUrlParser: true });
 
@@ -32,8 +34,14 @@ app.set("port", process.env.PORT || 3001);
 // Express only serves static assets in production
 if (process.env.NODE_ENV === "production") {
   app.use(express.static("client/build"));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+  });
 }
 
+app.get('/api/authUrl', (req, res) => {
+  res.json({ authUrl: `https://app.youneedabudget.com/oauth/authorize?client_id=${YNAB_ID}&redirect_uri=${YNAB_URI}&response_type=token`});
+});
 app.use('/api/accounts', accountRouter);
 app.use('/api/budgets', budgetRouter);
 app.use('/api/users', userRouter);
