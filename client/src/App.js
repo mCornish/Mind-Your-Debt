@@ -4,6 +4,8 @@ import axios from 'axios';
 import moment from 'moment';
 import './App.css';
 
+import Login from './components/Login/Login';
+
 function averageTransaction(transactions) {
   const monthPayments = transactions.reduce(toMonths, {});
   return _.toPairs(monthPayments).reduce(toAverages, {});
@@ -242,7 +244,7 @@ class App extends Component {
             )}
           </div>
         ) : (
-          <a role="button" href={this.state.authUrl}>Sign In To YNAB</a>
+          <Login url={this.state.authUrl}/>
         )}
       </div>
     );
