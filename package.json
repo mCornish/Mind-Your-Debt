@@ -21,7 +21,7 @@
     "start": "concurrently \"npm run server\" \"npm run client\"",
     "server": "node start-server.js",
     "dev-server": "nodemon server.js --exec babel-node --ext js --ignore client/",
-    "prod-server": "node server.js",
+    "prod-server": "babel-node server.js",
     "client": "node start-client.js"
   }
 }
