@@ -34,12 +34,6 @@ async function fetchAccounts(budgetId, token) {
     .catch((err) => { throw err });
 }
 
-async function fetchBudget(budgetId, token) {
-  return await axios(`/api/budgets/${budgetId}?token=${token}`)
-  .then((res) => res.data)
-  .catch((err) => { throw err });
-}
-
 async function fetchBudgets(token) {
   return await axios(`/api/budgets?token=${token}`)
     .then((res) => res.data)
@@ -67,6 +61,12 @@ async function fetchTransactions(budgetId, accountId, token) {
 async function fetchUser(token) {
   const userRes = await axios(`/api/users/ynab-user/${token}`);
   return userRes.data;
+}
+
+function getAverage(collection, property) {
+  const values = _.filter(collection, (item) => !!item[property]);
+  // if (!values.length) return null;
+  return _.meanBy(values, property);
 }
 
 function leastRecentDate(dates, format='MM-YY') {
@@ -129,7 +129,7 @@ class App extends Component {
         <h1>Mind Your Debt</h1>
         {authorized ? (
           <div>
-            {this.state.budget && (
+            {this.state.budget ? (
               <ul>
                 {this.state.allAccounts.map((account) => (
                   <li key={account.id}>
@@ -142,6 +142,16 @@ class App extends Component {
                       />
                       {account.name}
                     </label>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul>
+                {this.state.budgets.map((budget) => (
+                  <li key={budget.id}>
+                    <button
+                      onClick={() => this.selectBudget(budget)}
+                    >{budget.name}</button>
                   </li>
                 ))}
               </ul>
@@ -198,8 +208,8 @@ class App extends Component {
                   <tr>
                     <td>Total</td>
                     <td>{toDollars(_.sumBy(accounts, 'balance'))}</td>
-                    <td>{toDollars(_.meanBy(accounts, 'principal')) || '--'}</td>
-                    <td>{_.meanBy(accounts, 'interestRate') * 100 || '--'}</td>
+                    <td>{toDollars(getAverage(accounts, 'principal')) || '--'}</td>
+                    <td>{getAverage(accounts, 'interestRate') * 100 || '--'}</td>
                     <td>{toDollars(_.sumBy(accounts, this.averagePayment))}</td>
                     <td>{this.state.payoffDate.format('MMM YYYY')}</td>
                   </tr>
@@ -227,32 +237,14 @@ class App extends Component {
     
     const budgets = await fetchBudgets(authToken);
     const budget = budgets.length === 1 ? budgets[0] : null;
-    const accountsPromise = fetchAccounts(budget.id, authToken);
-    const categoriesPromise = fetchCategories(budget.id, authToken);
-    const monthPromise = fetchMonth(budget.id, authToken);
-    const [ allAccounts, allCategories, month ] = budget ?
-    await Promise.all([ accountsPromise, categoriesPromise, monthPromise ]) :
-    [[],[],null];
-
-    // Add YNAB data to saved accounts and initialize them
-    const combinedAccounts = user.accounts.map(toCombined);
-    const accounts = await Promise.all(combinedAccounts.map((account) => this.initAccount(account, budget, authToken, user)));
+    if (budget) this.fetchBudgetInfo({ authToken, budgetId: budget.id, user });
 
     this.setState({
-      accounts,
-      allAccounts,
-      allCategories,
       authToken,
       budget,
       budgets,
-      month,
       user
     });
-
-    function toCombined(account) {
-      const ynabAccount = _.find(allAccounts, { id: account.ynabId }) || {};
-      return _.assign({}, account, ynabAccount);
-    }
   }
 
   accountPayoffDate = (account) => {
@@ -271,17 +263,44 @@ class App extends Component {
     return account.averagePayments[mostRecentMonth.format('MM-YY')];
   }
 
-  initAccount = async (account, budget = this.state.budget, token = this.state.authToken, user = this.state.user) => {
+  fetchBudgetInfo = async ({ authToken, budgetId, user }) => {
+    if (!authToken) throw new Error('authToken undefined: YNAB authorization token is required.');
+    if (!budgetId) throw new Error('budgetId undefined: Budget ID is required.');
+    if (!user) throw new Error('user undefined: User is required.');
+
+    const accountsPromise = fetchAccounts(budgetId, authToken);
+    const categoriesPromise = fetchCategories(budgetId, authToken);
+    const monthPromise = fetchMonth(budgetId, authToken);
+    const [ allAccounts, allCategories, month ] = await Promise.all([ accountsPromise, categoriesPromise, monthPromise ]);
+
+    // Add YNAB data to saved accounts and initialize them
+    const combinedAccounts = user.accounts.map(toCombined);
+    const accounts = await Promise.all(combinedAccounts.map((account) => this.initAccount(account, budgetId, authToken, user._id)));
+
+    this.setState({
+      accounts,
+      allAccounts,
+      allCategories,
+      month,
+    });
+
+    function toCombined(account) {
+      const ynabAccount = _.find(allAccounts, { id: account.ynabId }) || {};
+      return _.assign({}, account, ynabAccount);
+    }
+  } 
+
+  initAccount = async (account, budgetId = this.state.budget.id, token = this.state.authToken, userId = this.state.user._id) => {
     const transactions =
     // this.state.transactions[account.id] ||
-    await fetchTransactions(budget.id, account.id, token);
+    await fetchTransactions(budgetId, account.id, token);
     // const transactions = accountTransactions ?
     // _.assign({}, this.state.transactions, { [account.id]: accountTransactions}) :
     // this.state.transactions;
 
     return _.assign({}, account, {
       averagePayments: await averageTransaction(transactions),
-      owner: user._id,
+      owner: userId,
       ynabId: account.ynabId || account.id
     });
   }
@@ -328,6 +347,18 @@ class App extends Component {
       .catch((err) => { throw err });
   }
 
+  /**
+   * Set active budget
+   */
+  selectBudget = (budget) => {
+    this.fetchBudgetInfo({
+      authToken: this.state.authToken,
+      budgetId: budget.id,
+      user: this.state.user
+    });
+    this.setState({ budget });
+  }
+
   setBudget = (newBudget) => {
     const payoffBudget = newBudget * 1000;
     this.setState({
@@ -342,7 +373,7 @@ class App extends Component {
   }
 
   setPrincipal = (account, principal) => {
-    if (!principal || principal === account.principal) return undefined;
+    if (principal === account.principal) return undefined;
     this.updateAccount(account, { principal: principal * 1000 });
   }
 
