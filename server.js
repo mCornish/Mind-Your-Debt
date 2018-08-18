@@ -41,6 +41,6 @@ app.use('/api/accounts', accountRouter);
 app.use('/api/budgets', budgetRouter);
 app.use('/api/users', userRouter);
 
-https.createServer(serverOptions, app).listen(app.get("port"), () => {
+https.createServer(app).listen(app.get("port"), () => {
   console.log(`Find the server at: https://localhost:${app.get("port")}/`); // eslint-disable-line no-console
 });
