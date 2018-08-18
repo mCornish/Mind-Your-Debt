@@ -130,21 +130,108 @@ class App extends Component {
         {authorized ? (
           <div>
             {this.state.budget ? (
-              <ul>
-                {this.state.allAccounts.map((account) => (
-                  <li key={account.id}>
-                    <label htmlFor={`acc-${account.id}`}>
-                      <input
-                        id={`acc-${account.id}`}
-                        type="checkbox"
-                        onChange={(e) => this.toggleAccount(account, e.target.checked)}
-                        checked={_.map(this.state.accounts, 'ynabId').includes(account.id)}
-                      />
-                      {account.name}
-                    </label>
-                  </li>
-                ))}
-              </ul>
+              <div>
+                {/* Budget Selection */}
+                <select
+                  defaultValue={_.find(this.state.budgets, { id: this.state.user.budgetId })}
+                  onChange={(e) => this.selectBudget(e.target.value)}
+                >
+                  {this.state.budgets.map((budget) => (
+                    <option
+                      key={budget.id}
+                      value={budget.id}
+                    >{budget.name}</option>
+                  ))}
+                </select>
+
+                {/* TODO: Make account selection collapsable */}
+                <ul>
+                  {this.state.allAccounts.map((account) => (
+                    <li key={account.id}>
+                      <label htmlFor={`acc-${account.id}`}>
+                        <input
+                          id={`acc-${account.id}`}
+                          type="checkbox"
+                          onChange={(e) => this.toggleAccount(account, e.target.checked)}
+                          checked={_.map(this.state.accounts, 'ynabId').includes(account.id)}
+                        />
+                        {account.name}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+
+                <h2>
+                  <label htmlFor="budget">
+                  Payoff Budget:
+                  <input
+                    id="budget"
+                    onChange={(e) => this.setBudget(e.target.value)}
+                  />
+                  </label>
+                </h2>
+                {this.state.month && (
+                  <h2>To Be Budgeted: {toDollars(this.state.month.to_be_budgeted)}</h2>
+                )}
+                <h2>Debts</h2>
+                {!!accounts.length && (
+                  // TODO: Make table sortable
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Balance</th>
+                        <th>Principal</th>
+                        <th>Interest Rate (%)</th>
+                        <th>Average Payment</th>
+                        <th>Payoff Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {accounts.map((account) => (
+                        <tr key={`active-${account.id}`}>
+                          <td>{account.name}</td>
+                          <td>{toDollars(account.balance)}</td>
+                          <td>
+                            <input
+                              type="number"
+                              onBlur={(e) => this.setPrincipal(account, e.target.value)}
+                              defaultValue={account.principal ? account.principal / 1000 : null}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              onBlur={(e) => this.setInterest(account, e.target.value)}
+                              defaultValue={account.interestRate ? account.interestRate * 100 : 0}
+                            />
+                          </td>
+                          <td>{toDollars(this.averagePayment(account))}</td>
+                          <td>{this.accountPayoffDate(account).format('MMM YYYY')}</td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td>Total</td>
+                        <td>{toDollars(_.sumBy(accounts, 'balance'))}</td>
+                        <td>{toDollars(getAverage(accounts, 'principal')) || '--'}</td>
+                        <td>{getAverage(accounts, 'interestRate') * 100 || '--'}</td>
+                        <td>{toDollars(_.sumBy(accounts, this.averagePayment))}</td>
+                        <td>{this.state.payoffDate.format('MMM YYYY')}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+        
+                {this.state.payoffDate && (
+                  <h2>
+                    Payoff Date: {this.state.payoffDate.format('MMM YYYY')} ({this.state.payoffDate.fromNow()})
+                    <br/>
+                    Monthly Payment: {
+                      toDollars(_.sumBy(_.filter(accounts, 'balance'), (account) => this.averagePayment(account)))
+                    }
+                  </h2>
+                )}
+              </div>
             ) : (
               <ul>
                 {this.state.budgets.map((budget) => (
@@ -156,75 +243,9 @@ class App extends Component {
                 ))}
               </ul>
             )}
-            
-            <h2>
-              <label htmlFor="budget">
-              Payoff Budget:
-              <input
-                id="budget"
-                onChange={(e) => this.setBudget(e.target.value)}
-              />
-              </label>
-            </h2>
-            {this.state.month && (
-              <h2>To Be Budgeted: {toDollars(this.state.month.to_be_budgeted)}</h2>
-            )}
-            <h2>Debts</h2>
-            {!!accounts.length && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Balance</th>
-                    <th>Principal</th>
-                    <th>Interest Rate (%)</th>
-                    <th>Average Payment</th>
-                    <th>Payoff Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accounts.map((account) => (
-                    <tr key={`active-${account.id}`}>
-                      <td>{account.name}</td>
-                      <td>{toDollars(account.balance)}</td>
-                      <td>
-                        <input
-                          type="number"
-                          onBlur={(e) => this.setPrincipal(account, e.target.value)}
-                          defaultValue={account.principal ? account.principal / 1000 : null}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          onBlur={(e) => this.setInterest(account, e.target.value)}
-                          defaultValue={account.interestRate ? account.interestRate * 100 : 0}
-                        />
-                      </td>
-                      <td>{toDollars(this.averagePayment(account))}</td>
-                      <td>{this.accountPayoffDate(account).format('MMM YYYY')}</td>
-                    </tr>
-                  ))}
-                  <tr>
-                    <td>Total</td>
-                    <td>{toDollars(_.sumBy(accounts, 'balance'))}</td>
-                    <td>{toDollars(getAverage(accounts, 'principal')) || '--'}</td>
-                    <td>{getAverage(accounts, 'interestRate') * 100 || '--'}</td>
-                    <td>{toDollars(_.sumBy(accounts, this.averagePayment))}</td>
-                    <td>{this.state.payoffDate.format('MMM YYYY')}</td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
-    
-            {this.state.payoffDate && (
-              <h2>
-              Payoff Date: {this.state.payoffDate.format('MMM YYYY')} ({this.state.payoffDate.fromNow()})
-              </h2>
-            )}
           </div>
         ) : (
-          <a href={authUrl}>Sign In</a>
+          <a role="button" href={authUrl}>Sign In To YNAB</a>
         )}
       </div>
     );
@@ -236,7 +257,8 @@ class App extends Component {
     const user = await fetchUser(authToken);
     
     const budgets = await fetchBudgets(authToken);
-    const budget = budgets.length === 1 ? budgets[0] : null;
+    if (!budgets.length) return undefined;
+    const budget = user.budgetId ? _.find(budgets, { id: user.budgetId }) : budgets[0];
     if (budget) this.fetchBudgetInfo({ authToken, budgetId: budget.id, user });
 
     this.setState({
@@ -282,6 +304,7 @@ class App extends Component {
       allAccounts,
       allCategories,
       month,
+      payoffDate: this.payoffDate(accounts, this.state.payoffBudget)
     });
 
     function toCombined(account) {
@@ -349,14 +372,25 @@ class App extends Component {
 
   /**
    * Set active budget
+   * @param {String | Object} budgetVal - Budget (or ID of Budget) to select
    */
-  selectBudget = (budget) => {
-    this.fetchBudgetInfo({
-      authToken: this.state.authToken,
-      budgetId: budget.id,
-      user: this.state.user
-    });
-    this.setState({ budget });
+  selectBudget = async (budgetVal) => {
+    // TODO: Organize accounts beneath a Budget model to fetch accounts for a budget after selection
+    try {
+      const budget = _.isString(budgetVal) ? _.find(this.state.budgets, { id: budgetVal }) : budgetVal;
+
+      this.fetchBudgetInfo({
+        authToken: this.state.authToken,
+        budgetId: budget.id,
+        user: this.state.user
+      });
+
+      const { data: user } = await axios.put(`/api/users/${this.state.user._id}`, { budgetId: budget.id });
+
+      this.setState({ budget, user });
+    } catch (err) {
+      throw err;
+    }
   }
 
   setBudget = (newBudget) => {

@@ -4,7 +4,8 @@ import {
   addAccount,
   createUser,
   getUser,
-  getYnabUser
+  getYnabUser,
+  updateUser
 } from '../controllers/userController';
 const userRouter = express.Router();
 
@@ -12,7 +13,8 @@ userRouter.route('/')
   .post(catchErrors(createUser));
 
 userRouter.route('/:id')
-  .get(catchErrors(getUser));
+  .get(catchErrors(getUser))
+  .put(catchErrors(updateUser));
 
 userRouter.route('/:id/accounts')
   .post(catchErrors(addAccount));

@@ -33,3 +33,11 @@ export async function getYnabUser(req, res) {
     const newUser = await (new User({ ynabId })).save();
     res.json(newUser);
 }
+
+export async function updateUser(req, res) {
+  const user = await User.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true
+  }).exec();
+  res.json(user);
+}
