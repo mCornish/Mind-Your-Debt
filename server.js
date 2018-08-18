@@ -1,6 +1,6 @@
 import express from 'express';
 import fs from 'fs';
-import http from 'http';
+import https from 'https';
 import bodyParser from 'body-parser';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
@@ -34,13 +34,12 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static("client/build"));
 }
 
-app.get('*', (req, res) => {
-	res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-});
 app.use('/api/accounts', accountRouter);
 app.use('/api/budgets', budgetRouter);
 app.use('/api/users', userRouter);
 
-http.createServer(app).listen(app.get("port"), () => {
+const server = process.env.NODE_ENV === 'production' ? app : https.createServer(serverOptions, app);
+
+server.listen(app.get("port"), () => {
   console.log(`Find the server at: https://localhost:${app.get("port")}/`); // eslint-disable-line no-console
 });
