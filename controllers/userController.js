@@ -22,7 +22,7 @@ export async function addBudgets(req, res, next) {
  */
 export async function getBudgets(req, res) {
   const user = await User.findById(req.params.id);
-  const budgets = await Budget.find({ '_id': { $in: user.budgets }});
+  const budgets = await Budget.find({ '_id': { $in: user.budgets }}).populate('accounts');
   res.json(budgets);
 }
 

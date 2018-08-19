@@ -3,6 +3,7 @@ import { catchErrors } from '../helpers';
 import {
   addAccounts,
   createBudget,
+  removeAccounts,
   getBudget,
   updateBudget
 } from '../controllers/budgetController';
@@ -16,6 +17,7 @@ budgetRouter.route('/:id')
   .put(catchErrors(updateBudget));
 
 budgetRouter.route('/:id/accounts')
-  .post(catchErrors(addAccounts));
+  .post(catchErrors(addAccounts))
+  .delete(catchErrors(removeAccounts));
 
 export default budgetRouter;

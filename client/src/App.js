@@ -125,6 +125,10 @@ function toDollars(milliunits) {
   return isNaN(value) ? null : `${sign} $${value}`;
 }
 
+async function removeBudgetAccounts(budgetId, ids) {
+  return (await axios.delete(`/api/budgets/${budgetId}/accounts`, { data: { ids: _.castArray(ids) }})).data;
+}
+
 class App extends Component {
   state = {
     accounts: [],
@@ -215,7 +219,7 @@ class App extends Component {
                     </thead>
                     <tbody>
                       {accounts.map((account, index) => (
-                        <tr key={`active-${account.id}`}>
+                        <tr key={`active-${account.id || index}`}>
                           <td>{account.name}</td>
                           <td>{toDollars(account.balance)}</td>
                           <td>
@@ -394,16 +398,16 @@ class App extends Component {
   setAccountInactive = async (account) => {
     const accountId = _.find(this.state.accounts, { ynabId: account.id })._id;
     const accounts = _.reject(this.state.accounts, { ynabId: account.id });
-    // const transactions = _.omit(this.state.transactions, account.id);
+    const budget = await removeBudgetAccounts(this.state.budget._id, accountId);
     
     this.setState({
       accounts,
-      payoffDate: this.payoffDate(accounts, this.state.payoffBudget),
-      // transactions
+      budget,
+      payoffDate: this.payoffDate(accounts, this.state.payoffBudget)
     });
 
-    axios.delete(`/api/accounts/${accountId}`)
-      .catch((err) => { throw err });
+    // axios.delete(`/api/accounts/${accountId}`)
+    //   .catch((err) => { throw err });
   }
 
   /**
@@ -460,6 +464,7 @@ class App extends Component {
   }
 
   updateAccount = (account, accountInfo) => {
+    console.log('​updateAccount -> account, accountInfo', account, accountInfo);
     const accountIndex = _.findIndex(this.state.accounts, { id: account.id });
     const accounts = this.state.accounts;
     const newAccount = _.assign({}, accounts[accountIndex], accountInfo);
