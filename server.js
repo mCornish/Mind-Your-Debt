@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import accountRouter from './routes/accountRouter';
 import budgetRouter from './routes/budgetRouter';
 import userRouter from './routes/userRouter';
+import ynabRouter from './routes/ynabRouter';
 
 
 // Set environment variables
@@ -45,6 +46,7 @@ app.get('/api/authUrl', (req, res) => {
 app.use('/api/accounts', accountRouter);
 app.use('/api/budgets', budgetRouter);
 app.use('/api/users', userRouter);
+app.use('/api/ynab', ynabRouter);
 
 const server = process.env.NODE_ENV === 'production' ? app : https.createServer(serverOptions, app);
 

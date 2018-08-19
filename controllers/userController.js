@@ -1,17 +1,29 @@
 import User from '../models/userModel';
+import Budget from '../models/budgetModel';
 import axios from 'axios';
-import '../models/accountModel';
+import { difference } from 'lodash';
 import { YNAB_BASE } from '../config';
 
-export async function addAccount(req, res, next) {
-  if (!req.body.accountId) next(new Error('Must include an account ID to add.'));
-  const user = await User.findById(req.params.id);
-  if (user.accounts.some((id) => id.equals(req.body.accountId))) return res.json(user);
 
-  const accounts = user.accounts.concat(req.body.accountId);
-  user.set({ accounts });
+export async function addBudgets(req, res, next) {
+  if (!req.body.ids) next(new Error('Must include Budget IDs to add.'));
+  const user = await User.findById(req.params.id);
+  const newIds = difference(req.body.ids, user.budgets);
+  if (!newIds.length) return res.json(user);
+
+  const budgets = user.budgets.concat(newIds);
+  user.set({ budgets });
   const updatedUser = await user.save();
   res.json(updatedUser);
+}
+
+/**
+ * Get User Budgets with the option of including YNAB Budget data if an auth token is included
+ */
+export async function getBudgets(req, res) {
+  const user = await User.findById(req.params.id);
+  const budgets = await Budget.find({ '_id': { $in: user.budgets }});
+  res.json(budgets);
 }
 
 export async function createUser(req, res) {
@@ -27,7 +39,7 @@ export async function getUser(req, res) {
 export async function getYnabUser(req, res) {
     const ynabUserRes = await axios(`${YNAB_BASE}/user?access_token=${req.params.token}`);
     const ynabId = ynabUserRes.data.data.user.id;
-    const user = await User.findOne({ ynabId }).populate('accounts');
+    const user = await User.findOne({ ynabId });
     if (user) return res.json(user);
 
     const newUser = await (new User({ ynabId })).save();

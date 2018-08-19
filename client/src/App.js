@@ -6,6 +6,24 @@ import './App.css';
 
 import Login from './components/Login/Login';
 
+async function addBudgetAccounts(budgetId, accounts) {
+  const newAccounts = await Promise.all(_.castArray(accounts).map(createAccount));
+  const ids = _.map(newAccounts, '_id');
+  const budget = (await axios.post(`/api/budgets/${budgetId}/accounts`, { ids })).data;
+  return { newAccounts, budget };
+}
+
+async function addUserBudgets(userId, budgets) {
+  const userBudgets = _.castArray(budgets).map((budget) => Object.assign({}, budget, {
+    owner: userId,
+    ynabId: budget.ynabId || budget.id
+  }));
+  const newBudgets = await Promise.all(userBudgets.map(createBudget));
+  const ids = _.map(newBudgets, '_id');
+  const user = (await axios.post(`/api/users/${userId}/budgets`, { ids })).data;
+  return { newBudgets, user };
+}
+
 function averageTransaction(transactions) {
   const monthPayments = transactions.reduce(toMonths, {});
   return _.toPairs(monthPayments).reduce(toAverages, {});
@@ -26,32 +44,41 @@ function averageTransaction(transactions) {
   }
 }
 
+async function createAccount(account) {
+  return (await axios.post('/api/accounts', account)).data;
+}
+async function createBudget(budget) {
+    return (await axios.post('/api/budgets', budget)).data;
+}
+
 async function fetchAccounts(budgetId, token) {
-  return await axios(`/api/budgets/${budgetId}/accounts?token=${token}`)
+  return await axios(`/api/ynab/budgets/${budgetId}/accounts?token=${token}`)
     .then((res) => res.data)
     .catch((err) => { throw err });
 }
 
-async function fetchBudgets(token) {
-  return await axios(`/api/budgets?token=${token}`)
-    .then((res) => res.data)
-    .catch((err) => { throw err });
+async function fetchUserBudgets(userId) {
+  return (await axios(`/api/users/${userId}/budgets`)).data;
+}
+
+async function fetchYnabBudgets(token) {
+  return (await axios(`/api/ynab/budgets?token=${token}`)).data;
 }
 
 async function fetchCategories(budgetId, token) {
-  return await axios(`/api/budgets/${budgetId}/categories?token=${token}`)
+  return await axios(`/api/ynab/budgets/${budgetId}/categories?token=${token}`)
     .then((res) => res.data)
     .catch((err) => { throw err });
 }
 
 async function fetchMonth(budgetId, token) {
-  return await axios(`/api/budgets/${budgetId}/months/current?token=${token}`)
+  return await axios(`/api/ynab/budgets/${budgetId}/months/current?token=${token}`)
     .then((res) => res.data)
     .catch((err) => { throw err });
 }
 
 async function fetchTransactions(budgetId, accountId, token) {
-  return await axios(`/api/budgets/${budgetId}/accounts/${accountId}/transactions?token=${token}`)
+  return await axios(`/api/ynab/budgets/${budgetId}/accounts/${accountId}/transactions?token=${token}`)
     .then((res) => res.data)
     .catch((err) => { throw err });
 }
@@ -132,13 +159,13 @@ class App extends Component {
               <div>
                 {/* Budget Selection */}
                 <select
-                  defaultValue={_.find(this.state.budgets, { id: this.state.user.budgetId })}
+                  defaultValue={_.find(this.state.budgets, { id: this.state.user.activeBudget })}
                   onChange={(e) => this.selectBudget(e.target.value)}
                 >
                   {this.state.budgets.map((budget) => (
                     <option
-                      key={budget.id}
-                      value={budget.id}
+                      key={budget._id}
+                      value={budget._id}
                     >{budget.name}</option>
                   ))}
                 </select>
@@ -258,11 +285,21 @@ class App extends Component {
         return this.setState({ authUrl: urlRes.data.authUrl });
       };
       const user = await fetchUser(authToken);
+
+      const userBudgets = await fetchUserBudgets(user._id);
+      const ynabBudgets = await fetchYnabBudgets(authToken);
+
+      if (!userBudgets.length && !ynabBudgets.length) return undefined;
+
+      // Add Budgets to User as necessary
+      const nonUserBudgets = ynabBudgets.filter((ynabBudget) => !_.find(userBudgets, { ynabId: ynabBudget.id }));
+      const { newBudgets } = await addUserBudgets(user._id, nonUserBudgets);
+      const withYnabData = (budget) => Object.assign({}, budget, _.find(ynabBudgets, { id: budget.ynabId }));
+      const budgets = userBudgets.concat(newBudgets).map((withYnabData));
       
-      const budgets = await fetchBudgets(authToken);
-      if (!budgets.length) return undefined;
-      const budget = user.budgetId ? _.find(budgets, { id: user.budgetId }) : budgets[0];
-      if (budget) this.fetchBudgetInfo({ authToken, budgetId: budget.id, user });
+      // Get active Budget and its corresponding data
+      const budget = user.activebudget ? _.find(budgets, { _id: user.activeBudget }) : budgets[0];
+      if (budget) this.fetchBudgetInfo({ authToken, budget, userId: user._id });
 
       this.setState({
         authToken,
@@ -291,19 +328,19 @@ class App extends Component {
     return account.averagePayments[mostRecentMonth.format('MM-YY')];
   }
 
-  fetchBudgetInfo = async ({ authToken, budgetId, user }) => {
+  fetchBudgetInfo = async ({ authToken, budget, userId }) => {
     if (!authToken) throw new Error('authToken undefined: YNAB authorization token is required.');
-    if (!budgetId) throw new Error('budgetId undefined: Budget ID is required.');
-    if (!user) throw new Error('user undefined: User is required.');
+    if (!budget) throw new Error('budget undefined: Budget is required.');
+    if (!userId) throw new Error('userId undefined: User ID is required.');
 
-    const accountsPromise = fetchAccounts(budgetId, authToken);
-    const categoriesPromise = fetchCategories(budgetId, authToken);
-    const monthPromise = fetchMonth(budgetId, authToken);
+    const accountsPromise = fetchAccounts(budget.ynabId, authToken);
+    const categoriesPromise = fetchCategories(budget.ynabId, authToken);
+    const monthPromise = fetchMonth(budget.ynabId, authToken);
     const [ allAccounts, allCategories, month ] = await Promise.all([ accountsPromise, categoriesPromise, monthPromise ]);
 
     // Add YNAB data to saved accounts and initialize them
-    const combinedAccounts = user.accounts.map(toCombined);
-    const accounts = await Promise.all(combinedAccounts.map((account) => this.initAccount(account, budgetId, authToken, user._id)));
+    const combinedAccounts = budget.accounts.map(toCombined);
+    const accounts = await Promise.all(combinedAccounts.map((account) => this.initAccount(account, budget.ynabId, authToken, userId)));
 
     this.setState({
       accounts,
@@ -319,13 +356,8 @@ class App extends Component {
     }
   } 
 
-  initAccount = async (account, budgetId = this.state.budget.id, token = this.state.authToken, userId = this.state.user._id) => {
-    const transactions =
-    // this.state.transactions[account.id] ||
-    await fetchTransactions(budgetId, account.id, token);
-    // const transactions = accountTransactions ?
-    // _.assign({}, this.state.transactions, { [account.id]: accountTransactions}) :
-    // this.state.transactions;
+  initAccount = async (account, budgetId = this.state.budget.ynabId, token = this.state.authToken, userId = this.state.user._id) => {
+    const transactions = await fetchTransactions(budgetId, account.id, token);
 
     return _.assign({}, account, {
       averagePayments: await averageTransaction(transactions),
@@ -350,15 +382,13 @@ class App extends Component {
     
     const newAccount = await this.initAccount(account);
     const accounts = this.state.accounts.concat(newAccount);
+    const { budget } = await addBudgetAccounts(this.state.budget._id, newAccount);
 
     this.setState({
       accounts,
+      budget,
       payoffDate: this.payoffDate(accounts, this.state.payoffBudget),
-      // transactions
     });
-
-    const accountRes = await axios.post(`/api/accounts/`, newAccount);
-    axios.post(`/api/users/${this.state.user._id}/accounts`, { accountId: accountRes.data._id });
   }
 
   setAccountInactive = async (account) => {
@@ -383,15 +413,15 @@ class App extends Component {
   selectBudget = async (budgetVal) => {
     // TODO: Organize accounts beneath a Budget model to fetch accounts for a budget after selection
     try {
-      const budget = _.isString(budgetVal) ? _.find(this.state.budgets, { id: budgetVal }) : budgetVal;
+      const budget = _.isString(budgetVal) ? _.find(this.state.budgets, { _id: budgetVal }) : budgetVal;
 
       this.fetchBudgetInfo({
         authToken: this.state.authToken,
-        budgetId: budget.id,
-        user: this.state.user
+        budget,
+        userId: this.state.user._id
       });
 
-      const { data: user } = await axios.put(`/api/users/${this.state.user._id}`, { budgetId: budget.id });
+      const { data: user } = await axios.put(`/api/users/${this.state.user._id}`, { activeBudget: budget._id });
 
       this.setState({ budget, user });
     } catch (err) {

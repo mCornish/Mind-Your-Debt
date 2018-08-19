@@ -1,8 +1,9 @@
 import express from 'express';
 import { catchErrors } from '../helpers';
 import {
-  addAccount,
+  addBudgets,
   createUser,
+  getBudgets,
   getUser,
   getYnabUser,
   updateUser
@@ -16,8 +17,9 @@ userRouter.route('/:id')
   .get(catchErrors(getUser))
   .put(catchErrors(updateUser));
 
-userRouter.route('/:id/accounts')
-  .post(catchErrors(addAccount));
+userRouter.route('/:id/budgets')
+  .get(catchErrors(getBudgets))
+  .post(catchErrors(addBudgets));
 
 userRouter.route('/ynab-user/:token')
   .get(catchErrors(getYnabUser));

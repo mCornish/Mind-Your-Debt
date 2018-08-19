@@ -1,16 +1,18 @@
 import mongoose from 'mongoose';
 
 const Schema = mongoose.Schema;
-const accountModel = new Schema({
+const budgetModel = new Schema({
   name: { type: String },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  interestRate: { type: Number },
-  principal: { type: Number },
+  accounts: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Account'
+  }],
   ynabId: { type: String }
 });
 
-export default mongoose.model('Account', accountModel);
+export default mongoose.model('Budget', budgetModel);
