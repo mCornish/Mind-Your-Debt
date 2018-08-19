@@ -95,7 +95,10 @@ class App extends Component {
                     <ul>
                       {this.state.allAccounts.map((account) => (
                         <li key={account.id}>
-                          <label htmlFor={`acc-${account.id}`}>
+                          <label
+                            htmlFor={`acc-${account.id}`}
+                            className={this.accountIsActive(account) ? 'is-active' : ''}
+                          >
                             <input
                               id={`acc-${account.id}`}
                               type="checkbox"
@@ -110,6 +113,7 @@ class App extends Component {
                   </Collapsable>
                 </div>
 
+                {/* TODO: Decide whether/how to incorporate budget balance */}
                 {/* <h2>
                   <label htmlFor="budget">
                     Payoff Budget:
@@ -247,6 +251,10 @@ class App extends Component {
     } catch (err) {
       throw err;
     }
+  }
+
+  accountIsActive = (account) => {
+    return _.map(this.state.accounts, 'ynabId').includes(account.ynabId || account.id);
   }
 
   fetchBudgetInfo = async ({ authToken, budget, userId }) => {
