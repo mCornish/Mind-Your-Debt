@@ -159,7 +159,7 @@ class App extends Component {
               <div>
                 {/* Budget Selection */}
                 <select
-                  defaultValue={_.find(this.state.budgets, { id: this.state.user.activeBudget })}
+                  defaultValue={_.find(this.state.budgets, { _id: this.state.user.activeBudget })._id}
                   onChange={(e) => this.selectBudget(e.target.value)}
                 >
                   {this.state.budgets.map((budget) => (
@@ -214,7 +214,7 @@ class App extends Component {
                       </tr>
                     </thead>
                     <tbody>
-                      {accounts.map((account) => (
+                      {accounts.map((account, index) => (
                         <tr key={`active-${account.id}`}>
                           <td>{account.name}</td>
                           <td>{toDollars(account.balance)}</td>
@@ -298,7 +298,7 @@ class App extends Component {
       const budgets = userBudgets.concat(newBudgets).map((withYnabData));
       
       // Get active Budget and its corresponding data
-      const budget = user.activebudget ? _.find(budgets, { _id: user.activeBudget }) : budgets[0];
+      const budget = user.activeBudget ? _.find(budgets, { _id: user.activeBudget }) : budgets[0];
       if (budget) this.fetchBudgetInfo({ authToken, budget, userId: user._id });
 
       this.setState({

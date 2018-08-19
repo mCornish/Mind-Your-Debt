@@ -70,9 +70,7 @@ ynabRouter.route('/budgets/:id/months/:month')
   });
 
 async function fetchAccounts(budgetId, token) {
-  return await axios(`${YNAB_BASE}/budgets/${budgetId}/accounts?access_token=${token}`)
-    .then((res) => res.data.data.accounts)
-    .catch((err) => { throw err });
+  return (await axios(`${YNAB_BASE}/budgets/${budgetId}/accounts?access_token=${token}`)).data.data.accounts;
 }
 
 async function fetchBudget(budgetId, token) {
