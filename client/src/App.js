@@ -9,7 +9,6 @@ import {
   averageTransaction,
   getAverage,
   leastRecentDate,
-  payoffMonths,
   toDollars
 } from './utils';
 import './App.css';
@@ -73,7 +72,7 @@ class App extends Component {
               <div>
                 {/* Budget Selection */}
                 <select
-                  defaultValue={_.find(this.state.budgets, { _id: this.state.user.activeBudget })._id}
+                  defaultValue={this.state.user.activeBudget && _.find(this.state.budgets, { _id: this.state.user.activeBudget })._id}
                   onChange={(e) => this.selectBudget(e.target.value)}
                 >
                   {this.state.budgets.map((budget) => (
@@ -84,94 +83,101 @@ class App extends Component {
                   ))}
                 </select>
 
-                {/* TODO: Make account selection collapsable */}
-                <Collapsable
-                  closeText="Hide Accounts"
-                  openText="Show Accounts"
-                >
-                  <ul>
-                    {this.state.allAccounts.map((account) => (
-                      <li key={account.id}>
-                        <label htmlFor={`acc-${account.id}`}>
-                          <input
-                            id={`acc-${account.id}`}
-                            type="checkbox"
-                            onChange={(e) => this.toggleAccount(account, e.target.checked)}
-                            checked={_.map(this.state.accounts, 'ynabId').includes(account.id)}
-                          />
-                          {account.name}
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                </Collapsable>
+                {/* Account Selection */}
+                <div className="AccountSelect">
+                  <Collapsable
+                    closeText="Hide Accounts"
+                    isHidden={!this.state.accounts.length}
+                    open={!this.state.accounts.length}
+                    openText="Show Accounts"
+                  >
+                    <p>Select your debt accounts:</p>
+                    <ul>
+                      {this.state.allAccounts.map((account) => (
+                        <li key={account.id}>
+                          <label htmlFor={`acc-${account.id}`}>
+                            <input
+                              id={`acc-${account.id}`}
+                              type="checkbox"
+                              onChange={(e) => this.toggleAccount(account, e.target.checked)}
+                              checked={_.map(this.state.accounts, 'ynabId').includes(account.id)}
+                            />
+                            {account.name}
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </Collapsable>
+                </div>
 
-                <h2>
+                {/* <h2>
                   <label htmlFor="budget">
-                  Payoff Budget:
-                  <input
-                    id="budget"
-                    onChange={(e) => this.setBudget(e.target.value)}
-                  />
+                    Payoff Budget:
+                    <input
+                      id="budget"
+                      onChange={(e) => this.setBudget(e.target.value)}
+                    />
                   </label>
                 </h2>
                 {this.state.month && (
                   <h2>To Be Budgeted: {toDollars(this.state.month.to_be_budgeted)}</h2>
-                )}
-                <h2>Debts</h2>
+                )} */}
                 {!!accounts.length && (
-                  // TODO: Create editable table component
-                  <table>
-                    <thead>
-                      <tr>
-                      {this.accountFields.map((field, index) => (
-                        <th
-                          key={index}
-                          onClick={() => this.sortAccounts(field.property)}
-                        >
-                          {field.label}
-                          {field.property === this.state.accountSort && (
-                            <span
-                              dangerouslySetInnerHTML={{__html: this.state.accountSortAsc ? '&#9652;' : '&#9662;'}}
-                            ></span>
-                          )}
-                        </th>
-                      ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {accounts.map((account) => (
-                        <tr key={`${account._id}`}>
-                          <td>{account.name}</td>
-                          <td>{toDollars(account.balance)}</td>
-                          <td>
-                            <input
-                              type="number"
-                              onBlur={(e) => this.setPrincipal(account, e.target.value)}
-                              defaultValue={account.principal ? account.principal / 1000 : null}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              onBlur={(e) => this.setInterest(account, e.target.value)}
-                              defaultValue={account.interestRate ? account.interestRate * 100 : 0}
-                            />
-                          </td>
-                          <td>{toDollars(averagePayment(account))}</td>
-                          <td>{accountPayoffDate(account).format('MMM YYYY')}</td>
+                  <div>
+                    <h2>Debts</h2>
+                    {/* TODO: Create editable table component */}
+                    <table className="EditableTable">
+                      <thead>
+                        <tr>
+                        {this.accountFields.map((field, index) => (
+                          <th
+                            key={index}
+                            onClick={() => this.sortAccounts(field.property)}
+                          >
+                            {field.label}
+                            {field.property === this.state.accountSort && (
+                              <span
+                                dangerouslySetInnerHTML={{__html: this.state.accountSortAsc ? '&#9652;' : '&#9662;'}}
+                              ></span>
+                            )}
+                          </th>
+                        ))}
                         </tr>
-                      ))}
-                      <tr>
-                        <td>Total</td>
-                        <td>{toDollars(_.sumBy(accounts, 'balance'))}</td>
-                        <td>{toDollars(getAverage(accounts, 'principal')) || '--'}</td>
-                        <td>{getAverage(accounts, 'interestRate') * 100 || '--'}</td>
-                        <td>{toDollars(_.sumBy(accounts, averagePayment))}</td>
-                        <td>{this.state.payoffDate.format('MMM YYYY')}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {accounts.map((account) => (
+                          <tr key={`${account._id}`}>
+                            <td>{account.name}</td>
+                            <td>{toDollars(Math.abs(account.balance))}</td>
+                            <td>
+                              <input
+                                type="number"
+                                onBlur={(e) => this.setPrincipal(account, e.target.value)}
+                                defaultValue={account.principal ? account.principal / 1000 : null}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                onBlur={(e) => this.setInterest(account, e.target.value)}
+                                defaultValue={account.interestRate ? account.interestRate * 100 : 0}
+                              />
+                            </td>
+                            <td>{toDollars(averagePayment(account))}</td>
+                            <td>{accountPayoffDate(account).format('MMM YYYY')}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td>Total</td>
+                          <td>{toDollars(_.sumBy(accounts, 'balance'))}</td>
+                          <td>{toDollars(getAverage(accounts, 'principal')) || '--'}</td>
+                          <td>{getAverage(accounts, 'interestRate') * 100 || '--'}</td>
+                          <td>{toDollars(Math.abs(_.sumBy(accounts, averagePayment)))}</td>
+                          <td>{this.state.payoffDate.format('MMM YYYY')}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 )}
         
                 {this.state.payoffDate && (
@@ -197,7 +203,10 @@ class App extends Component {
             )}
           </div>
         ) : (
-          <Login url={this.state.authUrl}/>
+          <Login
+            text="Sign in to You Need a Budget to begin managing your debt"
+            url={this.state.authUrl}
+          />
         )}
       </div>
     );

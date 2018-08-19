@@ -2,6 +2,10 @@
   padding: 2em;
 }
 
+th {
+  text-align: left;
+}
+
 ul {
   list-style-type: none;
   padding: 0;
@@ -11,6 +15,7 @@ ul {
 
 button,
 [role=button] {
+  display: inline-block;
   border: 3px solid rgba(0,0,0,.8);
   background-color: transparent;
   text-decoration: none;
@@ -29,4 +34,17 @@ button:hover,
 .logo {
   text-align: center;
   margin-top: 0;
+}
+
+.Login {
+  margin-top: 2em;
+  text-align: center;
+}
+
+.AccountSelect {
+  margin-top: 2em;
+}
+
+.EditableTable {
+  width: 100%;
 }
