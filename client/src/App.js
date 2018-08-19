@@ -218,8 +218,8 @@ class App extends Component {
                       </tr>
                     </thead>
                     <tbody>
-                      {accounts.map((account, index) => (
-                        <tr key={`active-${account.id || index}`}>
+                      {accounts.map((account) => (
+                        <tr key={`${account._id}`}>
                           <td>{account.name}</td>
                           <td>{toDollars(account.balance)}</td>
                           <td>
@@ -385,8 +385,8 @@ class App extends Component {
     if (this.state.accounts.includes(account)) return undefined;
     
     const newAccount = await this.initAccount(account);
-    const accounts = this.state.accounts.concat(newAccount);
-    const { budget } = await addBudgetAccounts(this.state.budget._id, newAccount);
+    const { budget, newAccounts } = await addBudgetAccounts(this.state.budget._id, newAccount);
+    const accounts = this.state.accounts.concat(Object.assign({}, newAccount, newAccounts[0]));
 
     this.setState({
       accounts,
@@ -464,7 +464,6 @@ class App extends Component {
   }
 
   updateAccount = (account, accountInfo) => {
-    console.log('​updateAccount -> account, accountInfo', account, accountInfo);
     const accountIndex = _.findIndex(this.state.accounts, { id: account.id });
     const accounts = this.state.accounts;
     const newAccount = _.assign({}, accounts[accountIndex], accountInfo);
