@@ -6,6 +6,22 @@ import {
   toPairs
 } from 'lodash';
 
+export function accountPayoffDate(account) {
+  if (!account) throw new Error('Must include an account');
+  if (!account.averagePayments) throw new Error('No average payments found');
+  const payment = averagePayment(account);
+  const principal = account.principal || account.balance;
+  const rate = account.interestRate;
+  const monthsRemaining = payoffMonths({ payment, principal, rate });
+  return moment().add(monthsRemaining, 'months');
+}
+
+export function averagePayment(account) {
+  const mostRecentMonth = mostRecentDate(Object.keys(account.averagePayments));
+  if (!mostRecentMonth) return 0;
+  return account.averagePayments[mostRecentMonth.format('MM-YY')];
+}
+
 export function averageTransaction(transactions) {
   const monthPayments = transactions.reduce(toMonths, {});
   return toPairs(monthPayments).reduce(toAverages, {});

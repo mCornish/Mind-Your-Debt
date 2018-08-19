@@ -4,10 +4,11 @@ import axios from 'axios';
 import moment from 'moment';
 import api from './api';
 import {
+  accountPayoffDate,
+  averagePayment,
   averageTransaction,
   getAverage,
   leastRecentDate,
-  mostRecentDate,
   payoffMonths,
   toDollars
 } from './utils';
@@ -19,6 +20,8 @@ import Login from './components/Login/Login';
 class App extends Component {
   state = {
     accounts: [],
+    accountSort: 'balance',
+    accountSortAsc: true,
     allAccounts: [],
     // allCategories: [],
     authUrl: '',
@@ -32,6 +35,26 @@ class App extends Component {
     user: null,
     Ynab: null
   };
+
+  accountFields = [{
+    label: 'Name',
+    property: 'name'
+  }, {
+    label: 'Balance',
+    property: 'balance'
+  }, {
+    label: 'Principal',
+    property: 'principal'
+  }, {
+    label: 'Interest Rate (%)',
+    property: 'interestRate'
+  }, {
+    label: 'Average Payment',
+    property: averagePayment
+  }, {
+    label: 'Payoff Date',
+    property: accountPayoffDate
+  }];
 
   componentDidMount() {
     this.init();
@@ -97,16 +120,23 @@ class App extends Component {
                 )}
                 <h2>Debts</h2>
                 {!!accounts.length && (
-                  // TODO: Make table sortable
+                  // TODO: Create editable table component
                   <table>
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Balance</th>
-                        <th>Principal</th>
-                        <th>Interest Rate (%)</th>
-                        <th>Average Payment</th>
-                        <th>Payoff Date</th>
+                      {this.accountFields.map((field, index) => (
+                        <th
+                          key={index}
+                          onClick={() => this.sortAccounts(field.property)}
+                        >
+                          {field.label}
+                          {field.property === this.state.accountSort && (
+                            <span
+                              dangerouslySetInnerHTML={{__html: this.state.accountSortAsc ? '&#9652;' : '&#9662;'}}
+                            ></span>
+                          )}
+                        </th>
+                      ))}
                       </tr>
                     </thead>
                     <tbody>
@@ -128,8 +158,8 @@ class App extends Component {
                               defaultValue={account.interestRate ? account.interestRate * 100 : 0}
                             />
                           </td>
-                          <td>{toDollars(this.averagePayment(account))}</td>
-                          <td>{this.accountPayoffDate(account).format('MMM YYYY')}</td>
+                          <td>{toDollars(averagePayment(account))}</td>
+                          <td>{accountPayoffDate(account).format('MMM YYYY')}</td>
                         </tr>
                       ))}
                       <tr>
@@ -137,7 +167,7 @@ class App extends Component {
                         <td>{toDollars(_.sumBy(accounts, 'balance'))}</td>
                         <td>{toDollars(getAverage(accounts, 'principal')) || '--'}</td>
                         <td>{getAverage(accounts, 'interestRate') * 100 || '--'}</td>
-                        <td>{toDollars(_.sumBy(accounts, this.averagePayment))}</td>
+                        <td>{toDollars(_.sumBy(accounts, averagePayment))}</td>
                         <td>{this.state.payoffDate.format('MMM YYYY')}</td>
                       </tr>
                     </tbody>
@@ -149,7 +179,7 @@ class App extends Component {
                     Payoff Date: {this.state.payoffDate.format('MMM YYYY')} ({this.state.payoffDate.fromNow()})
                     <br/>
                     Monthly Payment: {
-                      toDollars(_.sumBy(_.filter(accounts, 'balance'), (account) => this.averagePayment(account)))
+                      toDollars(_.sumBy(_.filter(accounts, 'balance'), (account) => averagePayment(account)))
                     }
                   </h2>
                 )}
@@ -207,22 +237,6 @@ class App extends Component {
     }
   }
 
-  accountPayoffDate = (account) => {
-    if (!account) throw new Error('Must include an account');
-    if (!account.averagePayments) throw new Error('No average payments found');
-    const payment = this.averagePayment(account);
-    const principal = account.principal || account.balance;
-    const rate = account.interestRate;
-    const monthsRemaining = payoffMonths({ payment, principal, rate });
-    return moment().add(monthsRemaining, 'months');
-  }
-
-  averagePayment = (account) => {
-    const mostRecentMonth = mostRecentDate(_.keys(account.averagePayments));
-    if (!mostRecentMonth) return 0;
-    return account.averagePayments[mostRecentMonth.format('MM-YY')];
-  }
-
   fetchBudgetInfo = async ({ authToken, budget, userId }) => {
     if (!authToken) throw new Error('authToken undefined: YNAB authorization token is required.');
     if (!budget) throw new Error('budget undefined: Budget is required.');
@@ -268,7 +282,7 @@ class App extends Component {
       const monthsRemaining = Math.ceil(totalBalance / monthlyPayment);
       return moment().add(monthsRemaining, 'months');
     }
-    const payoffDates = accounts.map(this.accountPayoffDate);
+    const payoffDates = accounts.map(accountPayoffDate);
     return leastRecentDate(payoffDates);
   }
 
@@ -338,7 +352,22 @@ class App extends Component {
     this.updateAccount(account, { principal: principal * 1000 });
   }
 
+  sortAccounts = (sortProperty) => {
+    // TODO: Fix sorting dates/moments
+    const isReverse = sortProperty === this.state.accountSort;
+    const accounts = isReverse ?
+      _.reverse(this.state.accounts) :
+      _.sortBy(this.state.accounts, sortProperty);
+
+    this.setState({
+      accounts,
+      accountSort: sortProperty,
+      accountSortAsc: isReverse ? !this.state.accountSortAsc : this.state.accountSortAsc
+    });
+  }
+
   toggleAccount = async (account, willBeActive) => {
+    // TODO: Sort accounts after toggling
     willBeActive ? this.setAccountActive(account) : this.setAccountInactive(account);
   }
 
