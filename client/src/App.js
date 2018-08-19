@@ -2,138 +2,25 @@ import React, { Component } from 'react';
 import _ from 'lodash';
 import axios from 'axios';
 import moment from 'moment';
+import api from './api';
+import {
+  averageTransaction,
+  getAverage,
+  leastRecentDate,
+  mostRecentDate,
+  payoffMonths,
+  toDollars
+} from './utils';
 import './App.css';
 
+import Collapsable from './components/Collapsable/Collapsable';
 import Login from './components/Login/Login';
-
-async function addBudgetAccounts(budgetId, accounts) {
-  const newAccounts = await Promise.all(_.castArray(accounts).map(createAccount));
-  const ids = _.map(newAccounts, '_id');
-  const budget = (await axios.post(`/api/budgets/${budgetId}/accounts`, { ids })).data;
-  return { newAccounts, budget };
-}
-
-async function addUserBudgets(userId, budgets) {
-  const userBudgets = _.castArray(budgets).map((budget) => Object.assign({}, budget, {
-    owner: userId,
-    ynabId: budget.ynabId || budget.id
-  }));
-  const newBudgets = await Promise.all(userBudgets.map(createBudget));
-  const ids = _.map(newBudgets, '_id');
-  const user = (await axios.post(`/api/users/${userId}/budgets`, { ids })).data;
-  return { newBudgets, user };
-}
-
-function averageTransaction(transactions) {
-  const monthPayments = transactions.reduce(toMonths, {});
-  return _.toPairs(monthPayments).reduce(toAverages, {});
-
-  function toMonths(payments, transaction) {
-    if (transaction.amount < 0) return payments;
-    const month = moment(transaction.date).format('MM-YY');
-    const currentPayments = payments[month] || [];
-    return _.assign({}, payments, {
-      [month]: currentPayments.concat(transaction.amount)
-    });
-  }
-
-  function toAverages(averages, paymentPair) {
-    return _.assign({}, averages, {
-      [paymentPair[0]]: _.mean(paymentPair[1])
-    });
-  }
-}
-
-async function createAccount(account) {
-  return (await axios.post('/api/accounts', account)).data;
-}
-async function createBudget(budget) {
-    return (await axios.post('/api/budgets', budget)).data;
-}
-
-async function fetchAccounts(budgetId, token) {
-  return await axios(`/api/ynab/budgets/${budgetId}/accounts?token=${token}`)
-    .then((res) => res.data)
-    .catch((err) => { throw err });
-}
-
-async function fetchUserBudgets(userId) {
-  return (await axios(`/api/users/${userId}/budgets`)).data;
-}
-
-async function fetchYnabBudgets(token) {
-  return (await axios(`/api/ynab/budgets?token=${token}`)).data;
-}
-
-async function fetchCategories(budgetId, token) {
-  return await axios(`/api/ynab/budgets/${budgetId}/categories?token=${token}`)
-    .then((res) => res.data)
-    .catch((err) => { throw err });
-}
-
-async function fetchMonth(budgetId, token) {
-  return await axios(`/api/ynab/budgets/${budgetId}/months/current?token=${token}`)
-    .then((res) => res.data)
-    .catch((err) => { throw err });
-}
-
-async function fetchTransactions(budgetId, accountId, token) {
-  return await axios(`/api/ynab/budgets/${budgetId}/accounts/${accountId}/transactions?token=${token}`)
-    .then((res) => res.data)
-    .catch((err) => { throw err });
-}
-
-async function fetchUser(token) {
-  const userRes = await axios(`/api/users/ynab-user/${token}`);
-  return userRes.data;
-}
-
-function getAverage(collection, property) {
-  const values = _.filter(collection, (item) => !!item[property]);
-  // if (!values.length) return null;
-  return _.meanBy(values, property);
-}
-
-function leastRecentDate(dates, format='MM-YY') {
-  const moments = dates.map((date) => moment(date, format));
-  return sortMoments(moments)[dates.length - 1];
-}
-
-function mostRecentDate(dates, format='MM-YY') {
-  const moments = dates.map((date) => moment(date, format));
-  return sortMoments(moments)[0];
-}
-
-function payoffMonths({ payment, principal, rate = .0000001 }) {
-  const monthRate = rate / 12;
-  const calc1 = Math.log(1 - ((Math.abs(principal) / payment) * monthRate));
-  const calc2 = Math.log(1 + monthRate);
-  return Math.ceil(-(calc1 / calc2)); 
-}
-
-function sortMoments(moments) {
-  return moments.sort((a, b) => {
-    if (a.isBefore(b)) return -1;
-    if (b.isBefore(a)) return 1;
-    return 0;
-  });
-}
-
-function toDollars(milliunits) {
-  const sign = milliunits < 0 ? '-' : '';
-  const value = Math.abs(milliunits / 1000).toFixed(2);
-  return isNaN(value) ? null : `${sign} $${value}`;
-}
-
-async function removeBudgetAccounts(budgetId, ids) {
-  return (await axios.delete(`/api/budgets/${budgetId}/accounts`, { data: { ids: _.castArray(ids) }})).data;
-}
 
 class App extends Component {
   state = {
     accounts: [],
     allAccounts: [],
-    allCategories: [],
+    // allCategories: [],
     authUrl: '',
     budgets: [],
     budget: null,
@@ -156,7 +43,7 @@ class App extends Component {
 
     return (
       <div className="App">
-        <h1>Mind Your Debt</h1>
+        <h1 className="logo">Mind Your Debt</h1>
         {authorized ? (
           <div>
             {this.state.budget ? (
@@ -175,21 +62,26 @@ class App extends Component {
                 </select>
 
                 {/* TODO: Make account selection collapsable */}
-                <ul>
-                  {this.state.allAccounts.map((account) => (
-                    <li key={account.id}>
-                      <label htmlFor={`acc-${account.id}`}>
-                        <input
-                          id={`acc-${account.id}`}
-                          type="checkbox"
-                          onChange={(e) => this.toggleAccount(account, e.target.checked)}
-                          checked={_.map(this.state.accounts, 'ynabId').includes(account.id)}
-                        />
-                        {account.name}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
+                <Collapsable
+                  closeText="Hide Accounts"
+                  openText="Show Accounts"
+                >
+                  <ul>
+                    {this.state.allAccounts.map((account) => (
+                      <li key={account.id}>
+                        <label htmlFor={`acc-${account.id}`}>
+                          <input
+                            id={`acc-${account.id}`}
+                            type="checkbox"
+                            onChange={(e) => this.toggleAccount(account, e.target.checked)}
+                            checked={_.map(this.state.accounts, 'ynabId').includes(account.id)}
+                          />
+                          {account.name}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </Collapsable>
 
                 <h2>
                   <label htmlFor="budget">
@@ -284,20 +176,19 @@ class App extends Component {
   init = async () => {
     try {
       const authToken = getAuthToken();
-      if (!authToken) {
-        const urlRes = await axios('/api/authUrl');
-        return this.setState({ authUrl: urlRes.data.authUrl });
-      };
-      const user = await fetchUser(authToken);
+      if (!authToken) return this.setState({ authUrl: await api.authUrl() });
 
-      const userBudgets = await fetchUserBudgets(user._id);
-      const ynabBudgets = await fetchYnabBudgets(authToken);
+      const user = await api.user(authToken);
+
+      // TODO: Implement a refresh button so new YNAB Budgets are fetches only upon user request
+      const userBudgets = await api.userBudgets(user._id);
+      const ynabBudgets = await api.ynabBudgets(authToken);
 
       if (!userBudgets.length && !ynabBudgets.length) return undefined;
 
       // Add Budgets to User as necessary
       const nonUserBudgets = ynabBudgets.filter((ynabBudget) => !_.find(userBudgets, { ynabId: ynabBudget.id }));
-      const { newBudgets } = await addUserBudgets(user._id, nonUserBudgets);
+      const { newBudgets } = await api.addUserBudgets(user._id, nonUserBudgets);
       const withYnabData = (budget) => Object.assign({}, budget, _.find(ynabBudgets, { id: budget.ynabId }));
       const budgets = userBudgets.concat(newBudgets).map((withYnabData));
       
@@ -337,10 +228,10 @@ class App extends Component {
     if (!budget) throw new Error('budget undefined: Budget is required.');
     if (!userId) throw new Error('userId undefined: User ID is required.');
 
-    const accountsPromise = fetchAccounts(budget.ynabId, authToken);
-    const categoriesPromise = fetchCategories(budget.ynabId, authToken);
-    const monthPromise = fetchMonth(budget.ynabId, authToken);
-    const [ allAccounts, allCategories, month ] = await Promise.all([ accountsPromise, categoriesPromise, monthPromise ]);
+    const accountsPromise = api.ynabAccounts(budget.ynabId, authToken);
+    // const categoriesPromise = fetchCategories(budget.ynabId, authToken);
+    const monthPromise = api.ynabMonth(budget.ynabId, authToken);
+    const [ allAccounts, month ] = await Promise.all([ accountsPromise, monthPromise ]);
 
     // Add YNAB data to saved accounts and initialize them
     const combinedAccounts = budget.accounts.map(toCombined);
@@ -349,7 +240,7 @@ class App extends Component {
     this.setState({
       accounts,
       allAccounts,
-      allCategories,
+      // allCategories,
       month,
       payoffDate: this.payoffDate(accounts, this.state.payoffBudget)
     });
@@ -361,7 +252,7 @@ class App extends Component {
   } 
 
   initAccount = async (account, budgetId = this.state.budget.ynabId, token = this.state.authToken, userId = this.state.user._id) => {
-    const transactions = await fetchTransactions(budgetId, account.id, token);
+    const transactions = await api.ynabTransactions(budgetId, account.id, token);
 
     return _.assign({}, account, {
       averagePayments: await averageTransaction(transactions),
@@ -385,7 +276,7 @@ class App extends Component {
     if (this.state.accounts.includes(account)) return undefined;
     
     const newAccount = await this.initAccount(account);
-    const { budget, newAccounts } = await addBudgetAccounts(this.state.budget._id, newAccount);
+    const { budget, newAccounts } = await api.addBudgetAccounts(this.state.budget._id, newAccount);
     const accounts = this.state.accounts.concat(Object.assign({}, newAccount, newAccounts[0]));
 
     this.setState({
@@ -398,16 +289,13 @@ class App extends Component {
   setAccountInactive = async (account) => {
     const accountId = _.find(this.state.accounts, { ynabId: account.id })._id;
     const accounts = _.reject(this.state.accounts, { ynabId: account.id });
-    const budget = await removeBudgetAccounts(this.state.budget._id, accountId);
+    const budget = await api.removeBudgetAccounts(this.state.budget._id, accountId);
     
     this.setState({
       accounts,
       budget,
       payoffDate: this.payoffDate(accounts, this.state.payoffBudget)
     });
-
-    // axios.delete(`/api/accounts/${accountId}`)
-    //   .catch((err) => { throw err });
   }
 
   /**
@@ -415,7 +303,6 @@ class App extends Component {
    * @param {String | Object} budgetVal - Budget (or ID of Budget) to select
    */
   selectBudget = async (budgetVal) => {
-    // TODO: Organize accounts beneath a Budget model to fetch accounts for a budget after selection
     try {
       const budget = _.isString(budgetVal) ? _.find(this.state.budgets, { _id: budgetVal }) : budgetVal;
 

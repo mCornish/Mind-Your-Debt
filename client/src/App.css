@@ -1,19 +1,32 @@
-.App ul {
+.App {
+  padding: 2em;
+}
+
+ul {
   list-style-type: none;
   padding: 0;
+  margin: 0;
 }
+
 
 button,
 [role=button] {
   border: 3px solid rgba(0,0,0,.8);
+  background-color: transparent;
   text-decoration: none;
   color: rgba(0,0,0,.8);
   font-weight: bold;
   padding: .5em;
+  cursor: pointer;
 }
 button:hover,
 [role=button]:hover {
   background-color: rgba(0,0,0,.8);
   border: 3px solid transparent;
   color: rgba(255,255,255,.8);
+}
+
+.logo {
+  text-align: center;
+  margin-top: 0;
 }
