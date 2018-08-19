@@ -36,6 +36,11 @@ button:hover,
   margin-top: 0;
 }
 
+.result {
+  font-weight: bold;
+  font-size: 1.5em;
+}
+
 .Login {
   margin-top: 2em;
   text-align: center;
@@ -47,4 +52,16 @@ button:hover,
 
 .EditableTable {
   width: 100%;
+  border-collapse: collapse;
+}
+.EditableTable th {
+  cursor: pointer;
+}
+.EditableTable td {
+  padding: .5em;
+}
+.EditableTable__total td {
+  border-top: 3px solid black;
+  padding-top: 1em;
+  font-weight: bold;
 }

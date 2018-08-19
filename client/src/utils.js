@@ -77,6 +77,6 @@ export function sortMoments(moments) {
 
 export function toDollars(milliunits) {
   const sign = milliunits < 0 ? '-' : '';
-  const value = Math.abs(milliunits / 1000).toFixed(2);
+  const value = Number(Math.abs(milliunits / 1000).toLocaleString()).toFixed(2);
   return isNaN(value) ? null : `${sign} $${value}`;
 }

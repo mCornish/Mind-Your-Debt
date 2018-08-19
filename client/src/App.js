@@ -167,12 +167,12 @@ class App extends Component {
                             <td>{accountPayoffDate(account).format('MMM YYYY')}</td>
                           </tr>
                         ))}
-                        <tr>
+                        <tr className="EditableTable__total">
                           <td>Total</td>
-                          <td>{toDollars(_.sumBy(accounts, 'balance'))}</td>
+                          <td>{toDollars(Math.abs(_.sumBy(accounts, 'balance')))}</td>
                           <td>{toDollars(getAverage(accounts, 'principal')) || '--'}</td>
-                          <td>{getAverage(accounts, 'interestRate') * 100 || '--'}</td>
-                          <td>{toDollars(Math.abs(_.sumBy(accounts, averagePayment)))}</td>
+                          <td>{(getAverage(accounts, 'interestRate') * 100).toFixed(2) || '--'}</td>
+                          <td>{toDollars(_.sumBy(accounts, averagePayment))}</td>
                           <td>{this.state.payoffDate.format('MMM YYYY')}</td>
                         </tr>
                       </tbody>
@@ -181,13 +181,16 @@ class App extends Component {
                 )}
         
                 {this.state.payoffDate && (
-                  <h2>
-                    Payoff Date: {this.state.payoffDate.format('MMM YYYY')} ({this.state.payoffDate.fromNow()})
-                    <br/>
-                    Monthly Payment: {
-                      toDollars(_.sumBy(_.filter(accounts, 'balance'), (account) => averagePayment(account)))
-                    }
-                  </h2>
+                  <div className="results">
+                    <p className="result">
+                      Payoff Date: {this.state.payoffDate.format('MMM YYYY')} ({this.state.payoffDate.fromNow()})
+                    </p>
+                    <p className="result">
+                      Monthly Payment: {
+                        toDollars(_.sumBy(_.filter(accounts, 'balance'), (account) => averagePayment(account)))
+                      }
+                    </p>
+                  </div>
                 )}
               </div>
             ) : (
@@ -261,7 +264,7 @@ class App extends Component {
     const accounts = await Promise.all(combinedAccounts.map((account) => this.initAccount(account, budget.ynabId, authToken, userId)));
 
     this.setState({
-      accounts,
+      accounts: _.sortBy(accounts, this.state.accountSort),
       allAccounts,
       // allCategories,
       month,
