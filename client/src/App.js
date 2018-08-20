@@ -16,6 +16,7 @@ import './App.css';
 import Collapsable from './components/Collapsable/Collapsable';
 import Login from './components/Login/Login';
 
+// TODO: Include some kind of visualization for amount of interest paid/accumulated
 class App extends Component {
   state = {
     accounts: [],
