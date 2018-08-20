@@ -72,6 +72,7 @@ class App extends Component {
             {this.state.budget ? (
               <div>
                 {/* Budget Selection */}
+                {/* Add null state for when there are no Budgets */}
                 <select
                   defaultValue={this.state.user.activeBudget && _.find(this.state.budgets, { _id: this.state.user.activeBudget })._id}
                   onChange={(e) => this.selectBudget(e.target.value)}
@@ -85,6 +86,7 @@ class App extends Component {
                 </select>
 
                 {/* Account Selection */}
+                {/* TODO: Add null state for when the Budget has no accounts */}
                 <div className="AccountSelect">
                   <Collapsable
                     closeText="Hide Accounts"
