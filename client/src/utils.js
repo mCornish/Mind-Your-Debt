@@ -61,7 +61,9 @@ export function mostRecentDate(dates, format='MM-YY') {
 }
 
 export function payoffMonths({ payment, principal, rate = .0000001 }) {
-  const monthRate = rate / 12;
+  // Prevent zero-value rate
+  const monthRate = (rate / 12) || .00000001;
+  
   const calc1 = Math.log(1 - ((Math.abs(principal) / payment) * monthRate));
   const calc2 = Math.log(1 + monthRate);
   return Math.ceil(-(calc1 / calc2)); 
