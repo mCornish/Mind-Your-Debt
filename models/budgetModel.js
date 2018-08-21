@@ -6,13 +6,17 @@ const budgetModel = new Schema({
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: 'You must include an owner'
   },
   accounts: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account'
   }],
-  ynabId: { type: String }
+  ynabId: { type: String },
+  created: {
+    type: Date,
+    default: Date.now
+  }
 });
 
 export default mongoose.model('Budget', budgetModel);

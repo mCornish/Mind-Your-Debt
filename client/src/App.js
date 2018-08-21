@@ -17,6 +17,7 @@ import Collapsable from './components/Collapsable/Collapsable';
 import Login from './components/Login/Login';
 
 // TODO: Include some kind of visualization for amount of interest paid/accumulated
+// TODO: Add and manage modified property on each model
 class App extends Component {
   state = {
     accounts: [],

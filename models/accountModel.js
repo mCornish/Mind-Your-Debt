@@ -6,11 +6,15 @@ const accountModel = new Schema({
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: 'You must include an owner'
   },
   interestRate: { type: Number },
   principal: { type: Number },
-  ynabId: { type: String }
+  ynabId: { type: String },
+  created: {
+    type: Date,
+    default: Date.now
+  }
 });
 
 export default mongoose.model('Account', accountModel);
