@@ -4,8 +4,13 @@ import './Login.css';
 
 class Login extends Component {
   static propTypes = {
+    disabled: PropTypes.bool,
     text: PropTypes.string,
     url: PropTypes.string
+  }
+
+  static defaultProps = {
+    disabled: false
   }
 
   render() {
@@ -14,13 +19,17 @@ class Login extends Component {
         {this.props.text && (
           <p className="Login__text">{this.props.text}</p>
         )}
-        <a
-          role="button"
+        <button
           className="Login__button"
-          href={this.props.url
-        }>Sign In To YNAB</a>
+          onClick={this.authenticate}
+          disabled={this.props.disabled}
+        >Sign In To YNAB</button>
       </div>
     );
+  }
+
+  authenticate = () => {
+    if (this.props.url) window.location.href = this.props.url;
   }
 }
 

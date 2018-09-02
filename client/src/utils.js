@@ -6,8 +6,13 @@ import {
   toPairs
 } from 'lodash';
 
+export function accountInterest(account) {
+  if (!account) throw new Error('account undefined: Account is required.');
+  return account.interestRate;
+}
+
 export function accountPayoffDate(account) {
-  if (!account) throw new Error('Must include an account');
+  if (!account) throw new Error('account undefined: Account is required.');
   if (!account.averagePayments) throw new Error('No average payments found');
   const payment = averagePayment(account);
   const principal = account.principal || account.balance;

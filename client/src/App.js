@@ -4,6 +4,7 @@ import axios from 'axios';
 import moment from 'moment';
 import api from './api';
 import {
+  accountInterest,
   accountPayoffDate,
   averagePayment,
   averageTransaction,
@@ -42,19 +43,31 @@ class App extends Component {
     property: 'name'
   }, {
     label: 'Balance',
-    property: 'balance'
+    property: 'balance',
+    transform: (balance) => toDollars(Math.abs(balance))
   }, {
     label: 'Principal',
-    property: 'principal'
+    property: 'principal',
+    input: {
+      default: (account) => account.principal ? account.principal / 1000 : null,
+      onBlur: (e, account) => this.setPrincipal(account, e.target.value),
+      type: 'number'
+    }
   }, {
     label: 'Interest Rate (%)',
     property: 'interestRate'
   }, {
+    label: 'Interest Accumulated',
+    property: accountInterest,
+    transform: toDollars
+  }, {
     label: 'Average Payment',
-    property: averagePayment
+    property: averagePayment,
+    transform: toDollars
   }, {
     label: 'Payoff Date',
-    property: accountPayoffDate
+    property: accountPayoffDate,
+    transform: (date) => date.format('MMM YYYY')
   }];
 
   componentDidMount() {
@@ -155,7 +168,16 @@ class App extends Component {
                       <tbody>
                         {accounts.map((account) => (
                           <tr key={`${account._id}`}>
-                            <td>{account.name}</td>
+                            {this.accountFields.map((field) => (
+                              <td key={field.label}>
+                                {_.isString(field.property) ? (
+                                  <span>{field.transform ? field.transform(account[field.property]) : account[field.property]}</span>
+                                ) : (
+                                  <span>{field.transform ? field.transform(field.property(account)) : field.property(account)}</span>
+                                )}
+                              </td>
+                            ))}
+                            {/* <td>{account.name}</td>
                             <td>{toDollars(Math.abs(account.balance))}</td>
                             <td>
                               <input
@@ -172,7 +194,7 @@ class App extends Component {
                               />
                             </td>
                             <td>{toDollars(averagePayment(account))}</td>
-                            <td>{accountPayoffDate(account).format('MMM YYYY')}</td>
+                            <td>{accountPayoffDate(account).format('MMM YYYY')}</td> */}
                           </tr>
                         ))}
                         <tr className="EditableTable__total">
@@ -180,6 +202,7 @@ class App extends Component {
                           <td>{toDollars(Math.abs(_.sumBy(accounts, 'balance')))}</td>
                           <td>{toDollars(getAverage(accounts, 'principal')) || '--'}</td>
                           <td>{(getAverage(accounts, 'interestRate') * 100).toFixed(2) || '--'}</td>
+                          <td>{toDollars(_.sumBy(accounts, accountInterest))}</td>
                           <td>{toDollars(_.sumBy(accounts, averagePayment))}</td>
                           <td>{this.state.payoffDate.format('MMM YYYY')}</td>
                         </tr>
@@ -214,10 +237,16 @@ class App extends Component {
             )}
           </div>
         ) : (
-          <Login
-            text="Sign in to You Need a Budget to begin managing your debt"
-            url={this.state.authUrl}
-          />
+          <div className="Login-container">
+            <Login
+              disabled={!this.state.authUrl}
+              text={this.state.authUrl ?
+                'Sign in to You Need a Budget to begin managing your debt' :
+                'Preparing sign in...'
+              }
+              url={this.state.authUrl}
+            />
+          </div>
         )}
       </div>
     );

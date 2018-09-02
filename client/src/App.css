@@ -30,6 +30,12 @@ button:hover,
   border: 3px solid transparent;
   color: rgba(255,255,255,.8);
 }
+button[disabled], button[disabled]:hover {
+  background-color: transparent;
+  border-color: rgba(0,0,0,.3);
+  color: rgba(0,0,0,.3);
+  cursor: default;
+}
 
 .logo {
   text-align: center;
@@ -41,7 +47,7 @@ button:hover,
   font-size: 1.5em;
 }
 
-.Login {
+.Login-container {
   margin-top: 2em;
   text-align: center;
 }
