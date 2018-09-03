@@ -8,7 +8,8 @@ import {
 
 export function accountInterest(account) {
   if (!account) throw new Error('account undefined: Account is required.');
-  return account.interestRate;
+  const principal = account.principal || account.balance;
+  return (account.interestRate / 12) * principal;
 }
 
 export function accountPayoffDate(account) {

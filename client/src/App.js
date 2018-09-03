@@ -19,12 +19,13 @@ import Login from './components/Login/Login';
 
 // TODO: Include some kind of visualization for amount of interest paid/accumulated
 // TODO: Add and manage modified property on each model
+// TODO: Implement Error Boundaries, particularly for failed API calls
 class App extends Component {
   state = {
     accounts: [],
     accountSort: 'balance',
     accountSortAsc: true,
-    allAccounts: [],
+    ynabAccounts: [],
     // allCategories: [],
     authUrl: '',
     budgets: [],
@@ -55,9 +56,14 @@ class App extends Component {
     }
   }, {
     label: 'Interest Rate (%)',
-    property: 'interestRate'
+    property: 'interestRate',
+    input: {
+      default: (account) => account.interestRate ? account.interestRate * 100 : 0,
+      onBlur: (e, account) => this.setInterest(account, e.target.value),
+      type: 'number'
+    }
   }, {
-    label: 'Interest Accumulated',
+    label: 'Monthly Interest',
     property: accountInterest,
     transform: toDollars
   }, {
@@ -99,6 +105,10 @@ class App extends Component {
                   ))}
                 </select>
 
+                <button
+                  onClick={this.syncYnabData}
+                >Sync</button>
+
                 {/* Account Selection */}
                 {/* TODO: Add null state for when the Budget has no accounts */}
                 <div className="AccountSelect">
@@ -110,7 +120,7 @@ class App extends Component {
                   >
                     <p>Select your debt accounts:</p>
                     <ul>
-                      {this.state.allAccounts.map((account) => (
+                      {this.state.ynabAccounts.map((account) => (
                         <li key={account.id}>
                           <label
                             htmlFor={`acc-${account.id}`}
@@ -170,31 +180,22 @@ class App extends Component {
                           <tr key={`${account._id}`}>
                             {this.accountFields.map((field) => (
                               <td key={field.label}>
-                                {_.isString(field.property) ? (
-                                  <span>{field.transform ? field.transform(account[field.property]) : account[field.property]}</span>
+                                {field.input ? (
+                                  // TODO: Display editable value rather than always displaying an input
+                                  <input
+                                    defaultValue={field.input.default(account)}
+                                    onBlur={(e) => field.input.onBlur(e, account)}
+                                    type={field.input.type}
+                                  />
                                 ) : (
-                                  <span>{field.transform ? field.transform(field.property(account)) : field.property(account)}</span>
+                                  _.isString(field.property) ? (
+                                    <span>{field.transform ? field.transform(account[field.property]) : account[field.property]}</span>
+                                  ) : (
+                                    <span>{field.transform ? field.transform(field.property(account)) : field.property(account)}</span>
+                                  )
                                 )}
                               </td>
                             ))}
-                            {/* <td>{account.name}</td>
-                            <td>{toDollars(Math.abs(account.balance))}</td>
-                            <td>
-                              <input
-                                type="number"
-                                onBlur={(e) => this.setPrincipal(account, e.target.value)}
-                                defaultValue={account.principal ? account.principal / 1000 : null}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                onBlur={(e) => this.setInterest(account, e.target.value)}
-                                defaultValue={account.interestRate ? account.interestRate * 100 : 0}
-                              />
-                            </td>
-                            <td>{toDollars(averagePayment(account))}</td>
-                            <td>{accountPayoffDate(account).format('MMM YYYY')}</td> */}
                           </tr>
                         ))}
                         <tr className="EditableTable__total">
@@ -259,26 +260,22 @@ class App extends Component {
 
       const user = await api.user(authToken);
 
-      // TODO: Implement a refresh button so new YNAB Budgets are fetches only upon user request
-      const userBudgets = await api.userBudgets(user._id);
-      const ynabBudgets = await api.ynabBudgets(authToken);
+      const budgets = user.budgets.length ?
+        await api.userBudgets(user._id) :
+        (await this.syncYnabData({ authToken, user })).budgets;
 
-      if (!userBudgets.length && !ynabBudgets.length) return undefined;
-
-      // Add Budgets to User as necessary
-      const nonUserBudgets = ynabBudgets.filter((ynabBudget) => !_.find(userBudgets, { ynabId: ynabBudget.id }));
-      const { newBudgets } = await api.addUserBudgets(user._id, nonUserBudgets);
-      const withYnabData = (budget) => Object.assign({}, budget, _.find(ynabBudgets, { id: budget.ynabId }));
-      const budgets = userBudgets.concat(newBudgets).map((withYnabData));
+      if (!budgets.length) return undefined;
       
       // Get active Budget and its corresponding data
       const budget = user.activeBudget ? _.find(budgets, { _id: user.activeBudget }) : budgets[0];
-      if (budget) this.fetchBudgetInfo({ authToken, budget, userId: user._id });
+      // if (budget) this.fetchBudgetInfo({ authToken, budget, userId: user._id });
 
       this.setState({
+        accounts: budget.accounts,
         authToken,
         budget,
         budgets,
+        payoffDate: this.payoffDate(budget.accounts),
         user
       });
     } catch (err) {
@@ -295,37 +292,51 @@ class App extends Component {
     if (!budget) throw new Error('budget undefined: Budget is required.');
     if (!userId) throw new Error('userId undefined: User ID is required.');
 
-    const accountsPromise = api.ynabAccounts(budget.ynabId, authToken);
+    const ynabAccounts = await api.ynabAccounts(budget.ynabId, authToken);
+    const savedAccounts = budget.accounts;
     // const categoriesPromise = fetchCategories(budget.ynabId, authToken);
-    const monthPromise = api.ynabMonth(budget.ynabId, authToken);
-    const [ allAccounts, month ] = await Promise.all([ accountsPromise, monthPromise ]);
+    // const monthPromise = api.ynabMonth(budget.ynabId, authToken);
+    // const [ ynabAccounts, month ] = await Promise.all([ accountsPromise, monthPromise ]);
+
+    // Add Accounts to Budget as necessary
+    const unsavedAccounts = ynabAccounts.filter((ynabAccount) => !_.find(savedAccounts, { ynabId: ynabAccount.id }));
+    const preparedAccounts = await Promise.all(unsavedAccounts.map((account) => this.initAccount({
+      account,
+      authToken,
+      budgetId: budget.ynabId,
+      userId
+    })));
+    const { accounts } = await api.addBudgetAccounts(budget._id, preparedAccounts);
 
     // Add YNAB data to saved accounts and initialize them
-    const combinedAccounts = budget.accounts.map(toCombined);
-    const accounts = await Promise.all(combinedAccounts.map((account) => this.initAccount(account, budget.ynabId, authToken, userId)));
+    // const combinedAccounts = budget.accounts.map(toCombined);
+    // const accounts = await Promise.all(budget.accounts.map((account) => this.initAccount(account, budget.ynabId, authToken, userId)));
 
-    this.setState({
+    return {
       accounts: _.sortBy(accounts, this.state.accountSort),
-      allAccounts,
       // allCategories,
-      month,
-      payoffDate: this.payoffDate(accounts, this.state.payoffBudget)
-    });
+      // month,
+      ynabAccounts
+    };
 
-    function toCombined(account) {
-      const ynabAccount = _.find(allAccounts, { id: account.ynabId }) || {};
-      return _.assign({}, account, ynabAccount);
-    }
+    // function toCombined(account) {
+    //   const ynabAccount = _.find(ynabAccounts, { id: account.ynabId }) || {};
+    //   return _.assign({}, account, ynabAccount);
+    // }
   } 
 
-  initAccount = async (account, budgetId = this.state.budget.ynabId, token = this.state.authToken, userId = this.state.user._id) => {
-    const transactions = await api.ynabTransactions(budgetId, account.id, token);
-
-    return _.assign({}, account, {
+  initAccount = async ({ account, budgetId = this.state.budget.ynabId, authToken = this.state.authToken, userId = this.state.user._id }) => {
+    if (!account) throw new Error('account undefined: Account is required.');
+    const transactions = await api.ynabTransactions(budgetId, account.id, authToken);
+    return {
+      ...account,
       averagePayments: await averageTransaction(transactions),
+      balance: Math.abs(account.balance || 0),
+      isActive: false,
+      interestRate: 0,
       owner: userId,
-      ynabId: account.ynabId || account.id
-    });
+      principal: Math.abs(account.balance || 0)
+    };
   }
 
   payoffDate = (accounts, monthlyPayment) => {
@@ -417,6 +428,30 @@ class App extends Component {
       accountSort: sortProperty,
       accountSortAsc: isReverse ? !this.state.accountSortAsc : this.state.accountSortAsc
     });
+  }
+
+  syncYnabData = async ({ authToken = this.state.authToken, user = this.state.user }) => {
+    const userBudgets = await api.userBudgets(user._id);
+    const ynabBudgets = await api.ynabBudgets(authToken);
+
+    if (!userBudgets.length && !ynabBudgets.length) return undefined;
+
+    // Add Budgets to User as necessary
+    const nonUserBudgets = ynabBudgets.filter((ynabBudget) => !_.find(userBudgets, { ynabId: ynabBudget.id }));
+    const { newBudgets } = await api.addUserBudgets(user._id, nonUserBudgets);
+    const withYnabData = (budget) => Object.assign({}, budget, _.find(ynabBudgets, { id: budget.ynabId }));
+    const budgets = userBudgets.concat(newBudgets).map((withYnabData));
+    
+    // Get active Budget and its corresponding data
+    const budget = user.activeBudget ? _.find(budgets, { _id: user.activeBudget }) : budgets[0];
+    const { accounts, ynabAccounts } = this.fetchBudgetInfo({ authToken, budget, userId: user._id });
+
+    return {
+      accounts,
+      budget,
+      budgets,
+      ynabAccounts
+    };
   }
 
   toggleAccount = async (account, willBeActive) => {
