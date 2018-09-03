@@ -12,6 +12,11 @@ const accountModel = new Schema({
     min: 0,
     required: 'You must include a balance'
   },
+  balanceHistory: {
+    type: Map,
+    of: { type: Number },
+    required: 'You must include balance history'
+  },
   interestRate: {
     type: Number,
     min: 0,

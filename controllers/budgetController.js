@@ -44,3 +44,14 @@ export async function updateBudget(req, res) {
   }).exec();
   res.json(budget);
 }
+
+export async function updateAccounts(req, res) {
+  const accountIds = req.body.ids;
+  if (!accountIds) next(new Error('Must include Account IDs to add.'));
+  const budget = await Budget.findById(req.params.id);
+  if (!accountIds.length) return res.json(budget);
+
+  budget.set({ accounts: accountIds });
+  const updatedBudget = await budget.save();
+  res.json(updatedBudget);
+}

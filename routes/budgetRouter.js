@@ -5,7 +5,8 @@ import {
   createBudget,
   removeAccounts,
   getBudget,
-  updateBudget
+  updateBudget,
+  updateAccounts
 } from '../controllers/budgetController';
 const budgetRouter = express.Router();
 
@@ -18,6 +19,7 @@ budgetRouter.route('/:id')
 
 budgetRouter.route('/:id/accounts')
   .post(catchErrors(addAccounts))
+  .put(catchErrors(updateAccounts))
   .delete(catchErrors(removeAccounts));
 
 export default budgetRouter;

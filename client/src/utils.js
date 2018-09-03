@@ -50,6 +50,18 @@ export function averageTransaction(transactions) {
   }
 }
 
+export function balanceHistory(transactions) {
+  return transactions.reduce(toHistory, {});
+
+  function toHistory(months, transaction) {
+    const monthName = moment(transaction.date).format('MM-YY');
+    const updatedMonth = months.hasOwnProperty(monthName) ?
+      months[monthName] + transaction.amount :
+      transaction.amount;
+    return { ...months, [monthName]: updatedMonth };
+  }
+}
+
 export function getAverage(collection, property) {
   const values = filter(collection, (item) => !!item[property]);
   // if (!values.length) return null;

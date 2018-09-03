@@ -8,6 +8,7 @@ import {
   accountPayoffDate,
   averagePayment,
   averageTransaction,
+  balanceHistory,
   getAverage,
   leastRecentDate,
   toDollars
@@ -201,11 +202,11 @@ class App extends Component {
                         ))}
                         <tr className="EditableTable__total">
                           <td>Total</td>
-                          <td>{toDollars(Math.abs(_.sumBy(accounts, 'balance')))}</td>
-                          <td>{toDollars(getAverage(accounts, 'principal')) || '--'}</td>
-                          <td>{(getAverage(accounts, 'interestRate') * 100).toFixed(2) || '--'}</td>
-                          <td>{toDollars(_.sumBy(accounts, accountInterest))}</td>
-                          <td>{toDollars(_.sumBy(accounts, averagePayment))}</td>
+                          <td>{toDollars(Math.abs(_.sumBy(activeAccounts, 'balance')))}</td>
+                          <td>{toDollars(getAverage(activeAccounts, 'principal')) || '--'}</td>
+                          <td>{(getAverage(activeAccounts, 'interestRate') * 100).toFixed(2) || '--'}</td>
+                          <td>{toDollars(_.sumBy(activeAccounts, accountInterest))}</td>
+                          <td>{toDollars(_.sumBy(activeAccounts, averagePayment))}</td>
                           <td>{this.state.payoffDate.format('MMM YYYY')}</td>
                         </tr>
                       </tbody>
@@ -300,14 +301,25 @@ class App extends Component {
     // const [ ynabAccounts, month ] = await Promise.all([ accountsPromise, monthPromise ]);
 
     // Add Accounts to Budget as necessary
-    const unsavedAccounts = ynabAccounts.filter((ynabAccount) => !_.find(savedAccounts, { ynabId: ynabAccount.id }));
-    const preparedAccounts = await Promise.all(unsavedAccounts.map((account) => this.initAccount({
+    const combinedAccounts = ynabAccounts.map((ynabAccount) => (
+      {
+        ...ynabAccount,
+        ...(_.find(savedAccounts, {
+          ynabId: ynabAccount.id
+        }))
+      }
+    ));
+    // const newAccounts = ynabAccounts.filter((ynabAccount) => !_.find(savedAccounts, { ynabId: ynabAccount.id }));
+    const preparedAccounts = await Promise.all(combinedAccounts.map((account) => this.initAccount({
       account,
       authToken,
       budgetId: budget.ynabId,
       userId
     })));
-    const { accounts } = await api.addBudgetAccounts(budget._id, preparedAccounts);
+    const { accounts } = await api.upsertBudgetAccounts(budget, preparedAccounts);
+
+    // Updated Accounts with YNAB data
+
 
     // Add YNAB data to saved accounts and initialize them
     // const combinedAccounts = budget.accounts.map(toCombined);
@@ -333,16 +345,16 @@ class App extends Component {
       ...account,
       averagePayments: await averageTransaction(transactions),
       balance: Math.abs(account.balance || 0),
-      isActive: false,
-      interestRate: 0,
+      balanceHistory: balanceHistory(transactions),
+      isActive: !!account.isActive,
+      interestRate: account.interestRate || 0,
       owner: userId,
-      principal: Math.abs(account.balance || 0),
+      principal: account.principal || Math.abs(account.balance || 0),
       ynabId: account.ynabId || account.id
     };
   }
 
   payoffDate = (accounts, monthlyPayment) => {
-    console.log('TCL: payoffDate -> accounts', accounts);
     const balances = _.map(accounts, 'balance');
     const totalBalance = Math.abs(_.sum(balances));
     if (monthlyPayment) {
@@ -457,7 +469,6 @@ class App extends Component {
   }
 
   toggleAccount = async (account, willBeActive) => {
-    console.log('TCL: toggleAccount -> account', account);
     // TODO: Sort accounts after toggling
     await this.updateAccount(account, { isActive: willBeActive });
     this.sortAccounts(this.accountSort, false);
@@ -475,7 +486,7 @@ class App extends Component {
   updateAccount = async (account, accountInfo) => {
     const accountIndex = _.findIndex(this.state.accounts, { _id: account._id });
     const accounts = this.state.accounts;
-    const newAccount = await api.updateAccount(account._id, { ...account, ...accountInfo });
+    const newAccount = await api.updateAccount({ ...account, ...accountInfo });
     accounts[accountIndex] = newAccount;
 
     this.setState({
