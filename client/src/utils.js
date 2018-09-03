@@ -51,6 +51,7 @@ export function averageTransaction(transactions) {
 }
 
 export function balanceHistory(transactions) {
+  // TODO: Get account balances for each month rather than just the sum of the transactions for that month (i.e. sum all previous transactions)
   return transactions.reduce(toHistory, {});
 
   function toHistory(months, transaction) {
