@@ -83,6 +83,7 @@ class App extends Component {
   render() {
     const accounts = this.state.accounts;
     const authorized = this.state.user;
+    const activeAccounts = _.filter(accounts, { isActive: true });
 
     return (
       <div className="App">
@@ -120,17 +121,17 @@ class App extends Component {
                   >
                     <p>Select your debt accounts:</p>
                     <ul>
-                      {this.state.ynabAccounts.map((account) => (
-                        <li key={account.id}>
+                      {accounts.map((account) => (
+                        <li key={account._id}>
                           <label
-                            htmlFor={`acc-${account.id}`}
-                            className={this.accountIsActive(account) ? 'is-active' : ''}
+                            htmlFor={`acc-${account._id}`}
+                            className={account.isActive ? 'is-active' : ''}
                           >
                             <input
-                              id={`acc-${account.id}`}
+                              id={`acc-${account._id}`}
                               type="checkbox"
                               onChange={(e) => this.toggleAccount(account, e.target.checked)}
-                              checked={_.map(this.state.accounts, 'ynabId').includes(account.id)}
+                              checked={account.isActive}
                             />
                             {account.name}
                           </label>
@@ -176,7 +177,7 @@ class App extends Component {
                         </tr>
                       </thead>
                       <tbody>
-                        {accounts.map((account) => (
+                        {activeAccounts.map((account) => (
                           <tr key={`${account._id}`}>
                             {this.accountFields.map((field) => (
                               <td key={field.label}>
@@ -335,11 +336,13 @@ class App extends Component {
       isActive: false,
       interestRate: 0,
       owner: userId,
-      principal: Math.abs(account.balance || 0)
+      principal: Math.abs(account.balance || 0),
+      ynabId: account.ynabId || account.id
     };
   }
 
   payoffDate = (accounts, monthlyPayment) => {
+    console.log('TCL: payoffDate -> accounts', accounts);
     const balances = _.map(accounts, 'balance');
     const totalBalance = Math.abs(_.sum(balances));
     if (monthlyPayment) {
@@ -416,9 +419,8 @@ class App extends Component {
     this.updateAccount(account, { principal: principal * 1000 });
   }
 
-  sortAccounts = (sortProperty) => {
+  sortAccounts = (sortProperty = this.state.accountSort, isReverse = sortProperty === this.state.accountSort) => {
     // TODO: Fix sorting dates/moments
-    const isReverse = sortProperty === this.state.accountSort;
     const accounts = isReverse ?
       _.reverse(this.state.accounts) :
       _.sortBy(this.state.accounts, sortProperty);
@@ -455,8 +457,11 @@ class App extends Component {
   }
 
   toggleAccount = async (account, willBeActive) => {
+    console.log('TCL: toggleAccount -> account', account);
     // TODO: Sort accounts after toggling
-    willBeActive ? this.setAccountActive(account) : this.setAccountInactive(account);
+    await this.updateAccount(account, { isActive: willBeActive });
+    this.sortAccounts(this.accountSort, false);
+    // willBeActive ? this.setAccountActive(account) : this.setAccountInactive(account);
   }
 
   toggleCategory = (category, willBeActive) => {
@@ -467,19 +472,18 @@ class App extends Component {
     this.setState({ categories });
   }
 
-  updateAccount = (account, accountInfo) => {
-    const accountIndex = _.findIndex(this.state.accounts, { id: account.id });
+  updateAccount = async (account, accountInfo) => {
+    const accountIndex = _.findIndex(this.state.accounts, { _id: account._id });
     const accounts = this.state.accounts;
-    const newAccount = _.assign({}, accounts[accountIndex], accountInfo);
+    const newAccount = await api.updateAccount(account._id, { ...account, ...accountInfo });
     accounts[accountIndex] = newAccount;
 
     this.setState({
       accounts,
-      payoffDate: this.payoffDate(this.state.accounts, this.state.payoffBudget)
+      payoffDate: this.payoffDate(accounts)
     });
 
-    axios.put(`/api/accounts/${account._id}`, accountInfo)
-      .catch((err) => { throw err });
+    return newAccount;
   }
 }
 

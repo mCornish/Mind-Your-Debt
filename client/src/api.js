@@ -7,7 +7,9 @@ import {
 export async function addBudgetAccounts(budgetId, accounts) {
   const newAccounts = await Promise.all(castArray(accounts).map(createAccount));
   const ids = map(newAccounts, '_id');
+  console.log('TCL: addBudgetAccounts -> ids', ids);
   const budget = (await axios.post(`/api/budgets/${budgetId}/accounts`, { ids })).data;
+  console.log('TCL: addBudgetAccounts -> budget', budget);
   return { newAccounts, budget };
 }
 
@@ -46,6 +48,10 @@ export async function removeBudgetAccounts(budgetId, ids) {
   return (await axios.delete(`/api/budgets/${budgetId}/accounts`, { data: { ids: castArray(ids) }})).data;
 }
 
+export async function updateAccount(accountId, accountInfo) {
+  return (await axios.put(`/api/accounts/${accountId}`, accountInfo)).data;
+}
+
 export async function ynabAccounts(budgetId, token) {
   return (await axios(`/api/ynab/budgets/${budgetId}/accounts?token=${token}`)).data;
 }
@@ -72,6 +78,7 @@ export default {
   authUrl,
   createAccount,
   createBudget,
+  updateAccount,
   user,
   userBudgets,
   removeBudgetAccounts,
